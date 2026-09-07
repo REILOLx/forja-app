@@ -1,4 +1,4 @@
-const CACHE_NAME = 'forja-cache-v3';
+const CACHE_NAME = 'forja-cache-v4';
 const ASSETS = [
   './',
   './index.html',
@@ -7,6 +7,8 @@ const ASSETS = [
   './js/app.js',
   './js/router.js',
   './js/store.js',
+  './js/supabase-client.js',
+  './js/views/login.js',
   './js/views/home.js',
   './js/views/rotina.js',
   './js/views/bloqueio.js',

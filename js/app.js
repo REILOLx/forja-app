@@ -15,6 +15,8 @@ import * as viewLancarGasto from './views/lancar-gasto.js';
 import * as viewCartoes from './views/cartoes.js';
 import * as viewEmprestimos from './views/emprestimos.js';
 import * as viewConfig from './views/config.js';
+import * as viewLogin from './views/login.js';
+import { sb } from './supabase-client.js';
 import { closeAddForm as closeRotinaAddForm } from './views/rotina.js';
 import { closeForms as closeCartoesForms } from './views/cartoes.js';
 import { closeForms as closeEmprestimosForms } from './views/emprestimos.js';
@@ -66,7 +68,22 @@ function renderNav(path) {
   `).join('');
 }
 
+let authReady = false;
+let currentSession = null;
+
 function render() {
+  if (!authReady) {
+    viewEl.innerHTML = '<div class="muted" style="padding:60px 20px;text-align:center;">Carregando…</div>';
+    navEl.innerHTML = '';
+    return;
+  }
+  if (!currentSession) {
+    viewEl.innerHTML = viewLogin.render();
+    navEl.innerHTML = '';
+    if (viewLogin.afterRender) viewLogin.afterRender(viewEl, { navigate, render });
+    return;
+  }
+
   const path = currentPath();
   const mod = resolveRoute(path);
   viewEl.innerHTML = mod.render(store.getState(), { navigate });
@@ -195,13 +212,25 @@ const ACTIONS = {
   removeFixedBill: (d) => {
     if (window.confirm('Remover esta conta fixa?')) store.removeFixedBill(d.id);
   },
+
+  logout: () => { sb.auth.signOut(); },
 };
 
 // expose for inline change handlers used inside views (see lancar-gasto.js)
-window.__forja = { store, render, navigate };
+window.__forja = { store, render, navigate, sb };
 
 onRouteChange(render);
-render();
+
+sb.auth.onAuthStateChange(async (_event, session) => {
+  currentSession = session;
+  if (session) {
+    await store.setCloudUser(session.user.id);
+  } else {
+    store.clearCloudUser();
+  }
+  authReady = true;
+  render();
+});
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

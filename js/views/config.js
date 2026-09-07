@@ -10,10 +10,9 @@ export function render() {
     <div class="card" style="border-color:var(--cyan);">
       <div style="font-size:14px;font-weight:700;margin-bottom:8px;">Onde ficam seus dados</div>
       <div class="muted" style="font-size:13px;line-height:1.5;">
-        Tudo (metas, rotina, treinos, leitura, finanças) fica salvo só neste navegador,
-        neste iPhone — não existe conta nem servidor. Isso significa que, se o iPhone
-        for trocado, resetado, ou o app apagado dos dados do Safari, essas informações
-        se perdem. Não há sincronização automática entre aparelhos.
+        Tudo (metas, rotina, treinos, leitura, finanças) fica salvo na nuvem (Supabase),
+        vinculado à sua conta — protegido por login, então só você acessa. Uma cópia
+        também fica neste navegador para abrir instantâneo e funcionar offline.
       </div>
     </div>
 
@@ -38,9 +37,12 @@ export function render() {
 
     <div>
       <div class="section-label" style="color:var(--red);">Zona de risco</div>
-      <button id="btn-reset" class="btn" style="background:var(--red-bg);color:var(--red);border:1px solid var(--red-border);display:flex;align-items:center;justify-content:center;gap:8px;">
-        <span style="width:16px;height:16px;display:flex;">${icon.trash()}</span> Apagar tudo e recomeçar
-      </button>
+      <div class="stack gap-8">
+        <button id="btn-reset" class="btn" style="background:var(--red-bg);color:var(--red);border:1px solid var(--red-border);display:flex;align-items:center;justify-content:center;gap:8px;">
+          <span style="width:16px;height:16px;display:flex;">${icon.trash()}</span> Apagar tudo e recomeçar
+        </button>
+        <button id="btn-logout" class="btn-ghost">Sair da conta</button>
+      </div>
     </div>
   `;
 }
@@ -86,5 +88,9 @@ export function afterRender(container) {
       store.resetApp();
       navigate('/home');
     }
+  });
+
+  container.querySelector('#btn-logout').addEventListener('click', () => {
+    window.__forja.sb.auth.signOut();
   });
 }

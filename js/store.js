@@ -1,3 +1,5 @@
+import { sb } from './supabase-client.js';
+
 // ---------- date helpers ----------
 export function todayISO(d = new Date()) {
   return d.toISOString().slice(0, 10);
@@ -199,8 +201,48 @@ export function getState() {
   return state;
 }
 
+let cloudUserId = null;
+let pushTimer = null;
+
+// Chamado pelo app.js assim que o login resolve. Na primeira vez que este
+// usuário loga, a nuvem ainda não tem linha nenhuma — nesse caso o que já
+// está salvo localmente (mesmo que seja só a semente inicial) vira o ponto
+// de partida e sobe para a nuvem. Da segunda vez em diante, a nuvem manda.
+export async function setCloudUser(userId) {
+  cloudUserId = userId;
+  if (!userId) return;
+  const { data: row, error } = await sb.from('app_state').select('data').eq('user_id', userId).maybeSingle();
+  if (error) { console.error('Supabase (buscar estado):', error.message); return; }
+  if (row && row.data) {
+    state = row.data;
+    persist(state);
+  } else {
+    await pushToCloudNow();
+  }
+}
+
+export function clearCloudUser() {
+  cloudUserId = null;
+  clearTimeout(pushTimer);
+}
+
+async function pushToCloudNow() {
+  if (!cloudUserId) return;
+  const { error } = await sb.from('app_state').upsert({
+    user_id: cloudUserId, data: state, updated_at: new Date().toISOString(),
+  });
+  if (error) console.error('Supabase (salvar estado):', error.message);
+}
+
+function scheduleCloudPush() {
+  if (!cloudUserId) return;
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(pushToCloudNow, 800);
+}
+
 export function save() {
   persist(state);
+  scheduleCloudPush();
 }
 
 export function resetApp() {
