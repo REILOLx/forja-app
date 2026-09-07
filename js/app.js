@@ -14,6 +14,7 @@ import * as viewPagamentos from './views/pagamentos.js';
 import * as viewLancarGasto from './views/lancar-gasto.js';
 import * as viewCartoes from './views/cartoes.js';
 import * as viewEmprestimos from './views/emprestimos.js';
+import * as viewConfig from './views/config.js';
 
 registerRoute('/home', viewHome);
 registerRoute('/rotina', viewRotina);
@@ -27,6 +28,7 @@ registerRoute('/financeiro/pagamentos', viewPagamentos);
 registerRoute('/financeiro/lancar', viewLancarGasto);
 registerRoute('/financeiro/cartoes', viewCartoes);
 registerRoute('/financeiro/emprestimos', viewEmprestimos);
+registerRoute('/config', viewConfig);
 
 const NAV_ITEMS = [
   { path: '/home', label: 'Início', icon: icon.home },
@@ -39,7 +41,7 @@ const NAV_ITEMS = [
 
 const NO_NAV_ROUTES = new Set([
   '/bloqueio', '/treino/verificacao', '/financeiro/pagamentos',
-  '/financeiro/lancar', '/financeiro/cartoes', '/financeiro/emprestimos',
+  '/financeiro/lancar', '/financeiro/cartoes', '/financeiro/emprestimos', '/config',
 ]);
 
 const viewEl = document.getElementById('view');

@@ -40,9 +40,12 @@ export function render(state) {
   return `
     <div class="row">
       <div class="muted" style="font-size:13px;">${formatDateLong(now)}</div>
-      <div class="row gap-8" style="background:var(--ember-bg);border:1px solid var(--ember-border);border-radius:20px;padding:6px 12px;">
-        <span style="width:15px;height:15px;color:var(--ember);display:flex;">${icon.flame()}</span>
-        <span class="fjc" style="font-size:14px;font-weight:700;color:oklch(0.85 0.1 55);">${streak}</span>
+      <div class="row gap-8">
+        <div class="row gap-8" style="background:var(--ember-bg);border:1px solid var(--ember-border);border-radius:20px;padding:6px 12px;">
+          <span style="width:15px;height:15px;color:var(--ember);display:flex;">${icon.flame()}</span>
+          <span class="fjc" style="font-size:14px;font-weight:700;color:oklch(0.85 0.1 55);">${streak}</span>
+        </div>
+        <a href="#/config" style="width:18px;height:18px;color:var(--text-dim-2);display:flex;">${icon.gear()}</a>
       </div>
     </div>
 

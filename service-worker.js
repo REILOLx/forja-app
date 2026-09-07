@@ -1,4 +1,4 @@
-const CACHE_NAME = 'forja-cache-v1';
+const CACHE_NAME = 'forja-cache-v2';
 const ASSETS = [
   './',
   './index.html',
@@ -19,6 +19,7 @@ const ASSETS = [
   './js/views/lancar-gasto.js',
   './js/views/cartoes.js',
   './js/views/emprestimos.js',
+  './js/views/config.js',
   './icons/icon-192.png',
   './icons/icon-512.png'
 ];

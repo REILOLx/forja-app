@@ -230,6 +230,21 @@ export function resetApp() {
   persist(state);
 }
 
+export function exportData() {
+  return JSON.stringify(state, null, 2);
+}
+
+// Substitui todo o estado a partir de um backup — lança erro se o arquivo
+// não parecer um backup do Forja, para não sobrescrever dados com lixo.
+export function importData(jsonString) {
+  const parsed = JSON.parse(jsonString);
+  if (!parsed || typeof parsed !== 'object' || !parsed.finance || !parsed.goals) {
+    throw new Error('Arquivo não parece ser um backup válido do Forja.');
+  }
+  state = parsed;
+  persist(state);
+}
+
 // ---------- routine / streak ----------
 export function todaysBlocks(d = new Date()) {
   const weekday = d.getDay();
