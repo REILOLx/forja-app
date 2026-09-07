@@ -15,6 +15,10 @@ import * as viewLancarGasto from './views/lancar-gasto.js';
 import * as viewCartoes from './views/cartoes.js';
 import * as viewEmprestimos from './views/emprestimos.js';
 import * as viewConfig from './views/config.js';
+import { closeAddForm as closeRotinaAddForm } from './views/rotina.js';
+import { closeForms as closeCartoesForms } from './views/cartoes.js';
+import { closeForms as closeEmprestimosForms } from './views/emprestimos.js';
+import { closeForms as closeFinanceiroForms } from './views/financeiro.js';
 
 registerRoute('/home', viewHome);
 registerRoute('/rotina', viewRotina);
@@ -72,11 +76,6 @@ function render() {
 }
 
 // ---------- central action dispatch (event delegation) ----------
-// Actions that only toggle a transient UI bit (an inline "add" form's
-// visibility) manage the DOM themselves and must NOT be followed by a full
-// re-render, which would just redraw the form back to its default (hidden) state.
-const LOCAL_ONLY_ACTIONS = new Set(['toggleAddCharge', 'toggleAddLoan']);
-
 document.addEventListener('click', (ev) => {
   const el = ev.target.closest('[data-action]');
   if (!el) return;
@@ -85,7 +84,7 @@ document.addEventListener('click', (ev) => {
   if (!handler) return;
   ev.preventDefault();
   handler(el.dataset, el);
-  if (!LOCAL_ONLY_ACTIONS.has(action)) render();
+  render();
 });
 
 function fieldsIn(scopeEl, root = document) {
@@ -99,8 +98,31 @@ function fieldsIn(scopeEl, root = document) {
 
 const ACTIONS = {
   toggleBlock: (d) => store.toggleBlockDone(d.date, d.id),
-  toggleKR: (d) => store.toggleKeyResult(d.goal, d.kr),
+  toggleKR: (d) => store.toggleKeyResult(d.year, d.goal, d.kr),
+  removeKR: (d) => store.removeKeyResult(d.year, d.goal, d.kr),
   toggleExercise: (d) => store.toggleExerciseDone(d.date, parseInt(d.idx, 10)),
+
+  skipTaskToday: (d) => store.removeTaskOccurrence(d.taskId, d.date),
+  deleteTaskRule: (d) => {
+    if (d.recurrence === 'once') {
+      if (window.confirm('Remover esta tarefa?')) store.deleteRoutineTask(d.taskId);
+    } else if (window.confirm('Isso remove essa tarefa de TODOS os dias em que ela se repete, não só hoje. Continuar?')) {
+      store.deleteRoutineTask(d.taskId);
+    }
+  },
+  saveNewTask: (d) => {
+    const f = fieldsIn(null, document);
+    if (!f.title || !f.start || !f.end) return;
+    let days = [];
+    if (f.recurrence === 'weekly') {
+      days = Array.from(document.querySelectorAll('#add-task-days input:checked')).map((el) => parseInt(el.dataset.day, 10));
+    }
+    store.addRoutineTask({
+      title: f.title, type: f.type, start: f.start, end: f.end,
+      recurrence: f.recurrence, days, date: f.recurrence === 'once' ? d.date : null,
+    });
+    closeRotinaAddForm();
+  },
   setFeeling: (d) => store.setWorkoutFeeling(d.date, d.feeling),
   completeWorkout: (d) => { store.completeWorkout(d.date); navigate('/treino'); },
   logReading: (d) => store.logReading(d.date, parseInt(d.minutes, 10)),
@@ -129,10 +151,6 @@ const ACTIONS = {
     navigate('/financeiro');
   },
 
-  toggleAddCharge: (d, el) => {
-    const box = document.getElementById('add-charge-box');
-    if (box) box.classList.toggle('hidden-box');
-  },
   salvarCompraParcelada: () => {
     const f = fieldsIn('#add-charge-box', document);
     if (!f.amount || f.amount <= 0) return;
@@ -140,12 +158,21 @@ const ACTIONS = {
       cardId: f.cardId, desc: f.desc || 'Compra', totalAmount: f.amount,
       installments: Math.max(parseInt(f.installments || '1', 10), 1),
     });
+    closeCartoesForms();
+  },
+  salvarCartao: () => {
+    const f = fieldsIn('#add-card-box', document);
+    if (!f.name || !f.limit) return;
+    store.addCard({ name: f.name, limit: f.limit, dueDay: f.dueDay || 10 });
+    closeCartoesForms();
+  },
+  removeCard: (d) => {
+    if (window.confirm('Remover este cartão e todas as compras parceladas ligadas a ele?')) store.removeCard(d.id);
+  },
+  removeCardCharge: (d) => {
+    if (window.confirm('Remover esta compra parcelada?')) store.removeCardCharge(d.id);
   },
 
-  toggleAddLoan: () => {
-    const box = document.getElementById('add-loan-box');
-    if (box) box.classList.toggle('hidden-box');
-  },
   salvarEmprestimo: () => {
     const f = fieldsIn('#add-loan-box', document);
     if (!f.totalAmount || f.totalAmount <= 0 || !f.installments) return;
@@ -153,6 +180,20 @@ const ACTIONS = {
       name: f.name || 'Empréstimo', bank: f.bank || '', totalAmount: f.totalAmount,
       installments: Math.max(parseInt(f.installments, 10), 1),
     });
+    closeEmprestimosForms();
+  },
+  removeLoan: (d) => {
+    if (window.confirm('Remover este empréstimo?')) store.removeLoan(d.id);
+  },
+
+  salvarContaFixa: () => {
+    const f = fieldsIn(null, document);
+    if (!f.name || !f.amount) return;
+    store.addFixedBill({ name: f.name, amount: f.amount, dueDay: f.dueDay || 10 });
+    closeFinanceiroForms();
+  },
+  removeFixedBill: (d) => {
+    if (window.confirm('Remover esta conta fixa?')) store.removeFixedBill(d.id);
   },
 };
 

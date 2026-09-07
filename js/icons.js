@@ -21,4 +21,5 @@ export const icon = {
   download: () => wrap('<path d="M12 4v11"/><path d="M7 11l5 5 5-5"/><path d="M5 20h14"/>'),
   upload: () => wrap('<path d="M12 20V9"/><path d="M7 13l5-5 5 5"/><path d="M5 20h14"/>'),
   trash: () => wrap('<path d="M5 7h14"/><path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/><path d="M7 7l1 13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1l1-13"/>'),
+  calendarOff: () => wrap('<rect x="4" y="5.5" width="16" height="14.5" rx="2"/><path d="M4 10h16"/><path d="M9.5 14l5 4"/><path d="M14.5 14l-5 4"/>'),
 };

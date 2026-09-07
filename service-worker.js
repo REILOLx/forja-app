@@ -1,4 +1,4 @@
-const CACHE_NAME = 'forja-cache-v2';
+const CACHE_NAME = 'forja-cache-v3';
 const ASSETS = [
   './',
   './index.html',
@@ -38,20 +38,16 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Network-first for navigation (so edits show up fast during dev), cache-first for static assets.
+// Network-first para tudo: sempre tenta buscar a versão mais nova primeiro
+// (evita telas desatualizadas ao publicar mudanças) e só cai no cache
+// (pra funcionar offline) se a rede falhar.
 self.addEventListener('fetch', (event) => {
   const req = event.request;
-  if (req.mode === 'navigate') {
-    event.respondWith(
-      fetch(req).catch(() => caches.match('./index.html'))
-    );
-    return;
-  }
   event.respondWith(
-    caches.match(req).then((cached) => cached || fetch(req).then((res) => {
+    fetch(req).then((res) => {
       const copy = res.clone();
       caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
       return res;
-    }).catch(() => cached))
+    }).catch(() => caches.match(req).then((cached) => cached || (req.mode === 'navigate' ? caches.match('./index.html') : undefined)))
   );
 });

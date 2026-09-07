@@ -1,7 +1,10 @@
 import { icon } from '../icons.js';
-import { todayISO, todaysWorkoutPlan, weekWorkoutSummary, weeksStreak, weekdayLabel } from '../store.js';
+import {
+  todayISO, todaysWorkoutPlan, weekWorkoutSummary, weeksStreak, weekdayLabel, weekdayHasTreino,
+} from '../store.js';
 
 const DAY_ABBR = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+let editingDow = null; // weekday sendo editado no momento, ou null
 
 export function render(state) {
   const now = new Date();
@@ -12,7 +15,7 @@ export function render(state) {
   const summary = weekWorkoutSummary(now);
 
   const strip = [0, 1, 2, 3, 4, 5, 6].map((dow) => {
-    const hasTreino = (state.routine[dow] || []).some((b) => b.type === 'treino');
+    const hasTreino = weekdayHasTreino(dow);
     const isToday = dow === todayDow;
     let bg = 'var(--surface-3)', content;
     if (!hasTreino) {
@@ -31,7 +34,10 @@ export function render(state) {
   }).join('');
 
   return `
-    <div class="fjc" style="font-size:22px;font-weight:700;">Treino</div>
+    <div class="row">
+      <div class="fjc" style="font-size:22px;font-weight:700;">Treino</div>
+      <span class="muted" style="font-size:12px;">toque num dia abaixo pra editar</span>
+    </div>
     <div class="grid-3" style="grid-template-columns:repeat(7, minmax(0, 1fr));">${strip}</div>
 
     ${plan ? `
@@ -41,7 +47,6 @@ export function render(state) {
             <div class="section-label" style="margin:0;color:oklch(0.8 0.1 55);">Hoje</div>
             <div class="fjc" style="font-size:18px;font-weight:700;">${plan.name}</div>
           </div>
-          <div class="muted" style="font-size:12px;">~50 min</div>
         </div>
         <div class="stack" style="border-radius:8px;overflow:hidden;border:1px solid var(--border);">
           ${plan.exercises.map((ex, i) => `
@@ -79,17 +84,101 @@ export function render(state) {
     <div>
       <div class="section-label">Plano da semana</div>
       <div class="stack gap-8">
-        ${[1, 2, 6].map((dow) => `
-          <div class="row card card-tight">
-            <span style="font-size:13.5px;">${state.workoutPlans[dow].name}</span>
-            <span style="font-size:12px;color:${dow === todayDow ? 'var(--ember)' : 'var(--text-dim)'};">${weekdayLabel(dow)}</span>
-          </div>
-        `).join('')}
-        <div class="row card card-tight">
-          <span style="font-size:13.5px;">Jiu-jitsu · técnica + sparring</span>
-          <span style="font-size:12px;color:${[3, 5].includes(todayDow) ? 'var(--ember)' : 'var(--text-dim)'};">Qua / Sex</span>
-        </div>
+        ${[0, 1, 2, 3, 4, 5, 6].map((dow) => {
+          const p = state.workoutPlans[dow];
+          const isEditing = editingDow === dow;
+          return `
+            <div class="card" style="${dow === todayDow ? 'border-color:var(--ember-border);' : ''}">
+              <button data-toggle-edit-dow="${dow}" class="row" style="width:100%;background:none;border:none;padding:0;color:inherit;">
+                <span style="font-size:13.5px;font-weight:600;">${weekdayLabel(dow)}</span>
+                <span class="row gap-8" style="width:auto;">
+                  <span style="font-size:12.5px;color:${p ? 'var(--text)' : 'var(--text-dim-2)'};">${p ? p.name : 'Off (descanso)'}</span>
+                  <span style="width:14px;height:14px;color:var(--text-dim-2);display:flex;transform:rotate(${isEditing ? '90' : '0'}deg);">${icon.chevronRight()}</span>
+                </span>
+              </button>
+              ${isEditing ? renderDayEditor(dow, p) : ''}
+            </div>`;
+        }).join('')}
       </div>
     </div>
   `;
+}
+
+function renderDayEditor(dow, plan) {
+  return `
+    <div class="stack gap-8" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
+      <label class="row" style="cursor:pointer;">
+        <span style="font-size:12.5px;">Dia de treino</span>
+        <input type="checkbox" data-toggle-off="${dow}" ${plan ? 'checked' : ''}>
+      </label>
+
+      ${plan ? `
+        <input type="text" data-plan-name="${dow}" value="${plan.name}" placeholder="Nome do treino (ex: Full Body A)">
+        <div class="stack gap-8">
+          ${plan.exercises.map((ex, i) => `
+            <div class="row gap-8">
+              <input type="text" data-ex-name="${dow}:${i}" value="${ex.name}" placeholder="Exercício" style="flex:2;">
+              <input type="text" data-ex-sets="${dow}:${i}" value="${ex.sets}" placeholder="4×8" style="flex:1;">
+              <button data-remove-ex="${dow}:${i}" style="background:none;border:none;color:var(--red);display:flex;padding:4px;">${icon.trash()}</button>
+            </div>
+          `).join('')}
+        </div>
+        <button data-add-ex="${dow}" class="btn-ghost">+ Exercício</button>
+      ` : ''}
+    </div>
+  `;
+}
+
+export function afterRender(container, { render }) {
+  container.querySelectorAll('[data-toggle-edit-dow]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const dow = parseInt(btn.dataset.toggleEditDow, 10);
+      editingDow = editingDow === dow ? null : dow;
+      render();
+    });
+  });
+
+  const store = window.__forja.store;
+
+  container.querySelectorAll('[data-toggle-off]').forEach((chk) => {
+    chk.addEventListener('change', () => {
+      const dow = parseInt(chk.dataset.toggleOff, 10);
+      if (chk.checked) store.setWorkoutPlanForDay(dow, { name: 'Treino', exercises: [] });
+      else store.setWorkoutPlanForDay(dow, null);
+      render();
+    });
+  });
+
+  container.querySelectorAll('[data-plan-name]').forEach((input) => {
+    input.addEventListener('change', () => {
+      store.renameWorkoutPlan(parseInt(input.dataset.planName, 10), input.value);
+    });
+  });
+
+  container.querySelectorAll('[data-ex-name]').forEach((input) => {
+    input.addEventListener('change', () => {
+      const [dow, idx] = input.dataset.exName.split(':').map(Number);
+      store.updateExerciseInPlan(dow, idx, { name: input.value });
+    });
+  });
+  container.querySelectorAll('[data-ex-sets]').forEach((input) => {
+    input.addEventListener('change', () => {
+      const [dow, idx] = input.dataset.exSets.split(':').map(Number);
+      store.updateExerciseInPlan(dow, idx, { sets: input.value });
+    });
+  });
+  container.querySelectorAll('[data-remove-ex]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const [dow, idx] = btn.dataset.removeEx.split(':').map(Number);
+      store.removeExerciseFromPlan(dow, idx);
+      render();
+    });
+  });
+  container.querySelectorAll('[data-add-ex]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const dow = parseInt(btn.dataset.addEx, 10);
+      store.addExerciseToPlan(dow, { name: '', sets: '' });
+      render();
+    });
+  });
 }

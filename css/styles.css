@@ -61,7 +61,7 @@ button { cursor: pointer; }
   flex: 1;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding: 22px 20px 20px 20px;
+  padding: max(22px, calc(env(safe-area-inset-top) + 10px)) 20px 20px 20px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -177,6 +177,13 @@ input[type="range"] { width: 100%; }
 ::placeholder { color: var(--text-dim-2); }
 
 .hidden-box { display: none !important; }
+
+/* Safety net: every icon from icons.js is a bare <svg viewBox="0 0 24 24">
+   with no width/height of its own, sized by its wrapper via flex-stretch.
+   If a wrapper ever forgets to set an explicit size, this keeps the icon
+   visible (20px) instead of collapsing to 0x0. Scoped to this exact viewBox
+   so it never touches the 36x36 progress rings, which set their own size. */
+svg[viewBox="0 0 24 24"] { width: 20px; height: 20px; }
 
 .timeline { position: relative; padding-left: 20px; }
 .timeline::before {

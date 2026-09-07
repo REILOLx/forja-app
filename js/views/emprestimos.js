@@ -2,6 +2,8 @@ import { icon } from '../icons.js';
 import { activeLoanBalance, formatMoney } from '../store.js';
 
 const CIRC = 2 * Math.PI * 15.5;
+let editingLoanId = null;
+let showAddLoan = false;
 
 function ring(pct, color) {
   const offset = CIRC * (1 - pct);
@@ -31,38 +33,90 @@ export function render(state) {
       const pct = l.installments ? l.paidInstallments / l.installments : 0;
       const remaining = activeLoanBalance(l);
       const color = remaining === 0 ? 'var(--green)' : pct > 0.6 ? 'var(--green)' : 'var(--ember)';
+      const isEditing = editingLoanId === l.id;
       return `
         <div class="card">
-          <div class="row gap-14" style="align-items:center;">
-            ${ring(pct, color)}
-            <div style="flex:1;">
-              <div style="font-size:14.5px;font-weight:700;margin-bottom:4px;">${l.name}</div>
-              <div class="muted" style="font-size:12px;margin-bottom:2px;">${l.bank}</div>
-              <div class="muted" style="font-size:12px;">${remaining === 0 ? 'Quitado' : `Faltam ${remaining} de ${l.installments} parcelas`}</div>
-            </div>
+          <div class="row" style="align-items:flex-start;margin-bottom:10px;">
+            <span class="muted" style="font-size:11px;"></span>
+            <span class="row gap-8" style="width:auto;">
+              <button data-toggle-edit-loan="${l.id}" style="background:none;border:none;color:var(--text-dim-2);display:flex;">${icon.gear()}</button>
+              <button data-action="removeLoan" data-id="${l.id}" style="background:none;border:none;color:var(--text-dim-2);display:flex;">${icon.trash()}</button>
+            </span>
           </div>
-          <div class="row" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);">
-            <div class="stack">
-              <span style="font-size:11px;color:var(--text-dim-2);">parcela mensal</span>
-              <span class="fjc" style="font-size:15px;font-weight:700;">${formatMoney(l.monthlyAmount)}</span>
+          ${isEditing ? `
+            <div class="stack gap-8">
+              <input type="text" data-loan-field="name" data-loan-id="${l.id}" value="${l.name}" placeholder="Nome">
+              <input type="text" data-loan-field="bank" data-loan-id="${l.id}" value="${l.bank}" placeholder="Banco">
+              <div class="row gap-8">
+                <input type="number" data-loan-field="totalAmount" data-loan-id="${l.id}" value="${l.totalAmount}" placeholder="Valor total" style="flex:1;">
+                <input type="number" data-loan-field="installments" data-loan-id="${l.id}" value="${l.installments}" placeholder="Nº parcelas" style="flex:1;">
+              </div>
+              <div class="row gap-8">
+                <input type="number" data-loan-field="paidInstallments" data-loan-id="${l.id}" value="${l.paidInstallments}" placeholder="Parcelas pagas" style="flex:1;">
+                <input type="number" data-loan-field="monthlyAmount" data-loan-id="${l.id}" value="${l.monthlyAmount}" placeholder="Valor da parcela" style="flex:1;">
+              </div>
             </div>
-            <div class="stack">
-              <span style="font-size:11px;color:var(--text-dim-2);">valor total</span>
-              <span class="fjc" style="font-size:15px;font-weight:700;">${formatMoney(l.totalAmount)}</span>
+          ` : `
+            <div class="row gap-14" style="align-items:center;">
+              ${ring(pct, color)}
+              <div style="flex:1;">
+                <div style="font-size:14.5px;font-weight:700;margin-bottom:4px;">${l.name}</div>
+                <div class="muted" style="font-size:12px;margin-bottom:2px;">${l.bank}</div>
+                <div class="muted" style="font-size:12px;">${remaining === 0 ? 'Quitado' : `Faltam ${remaining} de ${l.installments} parcelas`}</div>
+              </div>
             </div>
-          </div>
+            <div class="row" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);">
+              <div class="stack">
+                <span style="font-size:11px;color:var(--text-dim-2);">parcela mensal</span>
+                <span class="fjc" style="font-size:15px;font-weight:700;">${formatMoney(l.monthlyAmount)}</span>
+              </div>
+              <div class="stack">
+                <span style="font-size:11px;color:var(--text-dim-2);">valor total</span>
+                <span class="fjc" style="font-size:15px;font-weight:700;">${formatMoney(l.totalAmount)}</span>
+              </div>
+            </div>
+          `}
         </div>`;
     }).join('') || '<div class="muted">Nenhum empréstimo cadastrado.</div>'}
 
-    <button data-action="toggleAddLoan" class="btn-ghost">+ Lançar novo empréstimo</button>
+    <button id="btn-toggle-add-loan" class="btn-ghost">+ Lançar novo empréstimo</button>
 
-    <div id="add-loan-box" class="card hidden-box stack gap-8">
-      <div class="section-label" style="margin-bottom:0;">Novo empréstimo</div>
-      <input type="text" data-field="name" placeholder="Nome (ex: Empréstimo pessoal)">
-      <input type="text" data-field="bank" placeholder="Banco / instituição">
-      <input type="number" data-field="totalAmount" step="0.01" min="0" placeholder="Valor total (R$)">
-      <input type="number" data-field="installments" min="1" max="120" placeholder="Número de parcelas">
-      <button data-action="salvarEmprestimo" class="btn btn-primary">Salvar empréstimo</button>
-    </div>
+    ${showAddLoan ? `
+      <div class="card stack gap-8" id="add-loan-box">
+        <div class="section-label" style="margin-bottom:0;">Novo empréstimo</div>
+        <input type="text" data-field="name" placeholder="Nome (ex: Empréstimo pessoal)">
+        <input type="text" data-field="bank" placeholder="Banco / instituição">
+        <input type="number" data-field="totalAmount" step="0.01" min="0" placeholder="Valor total (R$)">
+        <input type="number" data-field="installments" min="1" max="120" placeholder="Número de parcelas">
+        <button data-action="salvarEmprestimo" class="btn btn-primary">Salvar empréstimo</button>
+      </div>
+    ` : ''}
   `;
+}
+
+export function afterRender(container, { render }) {
+  const store = window.__forja.store;
+
+  container.querySelectorAll('[data-toggle-edit-loan]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.toggleEditLoan;
+      editingLoanId = editingLoanId === id ? null : id;
+      render();
+    });
+  });
+
+  container.querySelectorAll('[data-loan-field]').forEach((input) => {
+    input.addEventListener('change', () => {
+      const val = input.type === 'number' ? parseFloat(input.value || '0') : input.value;
+      store.updateLoan(input.dataset.loanId, { [input.dataset.loanField]: val });
+      render();
+    });
+  });
+
+  const addBtn = container.querySelector('#btn-toggle-add-loan');
+  if (addBtn) addBtn.addEventListener('click', () => { showAddLoan = !showAddLoan; render(); });
+}
+
+export function closeForms() {
+  showAddLoan = false;
 }

@@ -31,108 +31,81 @@ export function formatHM(minutesTotal) {
   if (h <= 0) return `${m}min`;
   return `${h}h ${m}min`;
 }
+function dowOf(dateISO) {
+  return new Date(dateISO + 'T12:00:00').getDay();
+}
+function uid(prefix) {
+  return prefix + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
 
-const STORAGE_KEY = 'forja:v1';
+const STORAGE_KEY = 'forja:v2';
 
 function seedState() {
   const thisMonth = monthKey();
+  const thisYear = String(new Date().getFullYear());
+
   return {
-    version: 1,
+    version: 2,
     profile: { budgetMensal: 3000 },
 
-    goals: [
-      {
-        id: 'corpo', title: 'Corpo', color: 'ember',
-        keyResults: [
-          { id: 'kr1', title: 'Faixa roxa no jiu-jitsu', done: false },
-          { id: 'kr2', title: 'Agachar com 100kg × 5', done: false },
-          { id: 'kr3', title: '90% de adesão nos treinos do ano', done: false },
-        ],
-      },
-      {
-        id: 'mente', title: 'Mente', color: 'cyan',
-        keyResults: [
-          { id: 'kr4', title: 'Concluir curso de inglês avançado', done: false },
-          { id: 'kr5', title: 'Ler 24 livros no ano', done: false },
-          { id: 'kr6', title: 'Reduzir tempo de redes para <30min/dia', done: false },
-        ],
-      },
-      {
-        id: 'carreira', title: 'Carreira', color: 'green',
-        keyResults: [
-          { id: 'kr7', title: 'Lançar projeto pessoal', done: false },
-          { id: 'kr8', title: 'Certificação técnica', done: false },
-        ],
-      },
-    ],
-
-    // routine template per weekday (0=domingo ... 6=sábado)
-    routine: {
-      1: [
-        { id: 'r1', start: '05:30', end: '05:45', title: 'Acordar + água + luz solar', type: 'rotina' },
-        { id: 'r2', start: '06:00', end: '07:00', title: 'Treino', type: 'treino' },
-        { id: 'r3', start: '08:00', end: '12:00', title: 'Trabalho focado', type: 'foco' },
-        { id: 'r4', start: '12:00', end: '13:00', title: 'Almoço + pausa', type: 'rotina' },
-        { id: 'r5', start: '13:00', end: '18:00', title: 'Trabalho focado', type: 'foco' },
-        { id: 'r6', start: '18:30', end: '20:00', title: 'Jiu-jitsu', type: 'treino' },
-        { id: 'r7', start: '20:00', end: '20:30', title: 'Jantar', type: 'rotina' },
-        { id: 'r8', start: '20:30', end: '21:30', title: 'Leitura / Estudo dirigido', type: 'estudo' },
-        { id: 'r9', start: '21:30', end: '22:30', title: 'Janela livre — redes sociais', type: 'livre' },
-        { id: 'r10', start: '23:00', end: '23:15', title: 'Journaling + dormir', type: 'rotina' },
-      ],
-      2: [
-        { id: 'r1', start: '05:30', end: '05:45', title: 'Acordar + água + luz solar', type: 'rotina' },
-        { id: 'r2', start: '06:00', end: '07:00', title: 'Treino', type: 'treino' },
-        { id: 'r3', start: '08:00', end: '12:00', title: 'Trabalho focado', type: 'foco' },
-        { id: 'r4', start: '12:00', end: '13:00', title: 'Almoço + pausa', type: 'rotina' },
-        { id: 'r5', start: '13:00', end: '18:00', title: 'Trabalho focado', type: 'foco' },
-        { id: 'r6', start: '18:30', end: '20:00', title: 'Jiu-jitsu', type: 'treino' },
-        { id: 'r7', start: '20:00', end: '20:30', title: 'Jantar', type: 'rotina' },
-        { id: 'r8', start: '20:30', end: '21:30', title: 'Leitura / Estudo dirigido', type: 'estudo' },
-        { id: 'r9', start: '21:30', end: '22:30', title: 'Janela livre — redes sociais', type: 'livre' },
-        { id: 'r10', start: '23:00', end: '23:15', title: 'Journaling + dormir', type: 'rotina' },
-      ],
-      3: [
-        { id: 'r1', start: '05:30', end: '05:45', title: 'Acordar + água + luz solar', type: 'rotina' },
-        { id: 'r3', start: '08:00', end: '12:00', title: 'Trabalho focado', type: 'foco' },
-        { id: 'r4', start: '12:00', end: '13:00', title: 'Almoço + pausa', type: 'rotina' },
-        { id: 'r5', start: '13:00', end: '18:00', title: 'Trabalho focado', type: 'foco' },
-        { id: 'r6', start: '18:30', end: '20:00', title: 'Jiu-jitsu — treino técnico', type: 'treino' },
-        { id: 'r7', start: '20:00', end: '20:30', title: 'Jantar', type: 'rotina' },
-        { id: 'r8', start: '20:30', end: '21:30', title: 'Leitura / Estudo dirigido', type: 'estudo' },
-        { id: 'r9', start: '21:30', end: '22:30', title: 'Janela livre — redes sociais', type: 'livre' },
-        { id: 'r10', start: '23:00', end: '23:15', title: 'Journaling + dormir', type: 'rotina' },
-      ],
-      4: [
-        { id: 'r1', start: '05:30', end: '05:45', title: 'Acordar + água + luz solar', type: 'rotina' },
-        { id: 'r3', start: '08:00', end: '12:00', title: 'Trabalho focado', type: 'foco' },
-        { id: 'r4', start: '12:00', end: '13:00', title: 'Almoço + pausa', type: 'rotina' },
-        { id: 'r5', start: '13:00', end: '18:00', title: 'Trabalho focado', type: 'foco' },
-        { id: 'r7', start: '20:00', end: '20:30', title: 'Jantar', type: 'rotina' },
-        { id: 'r8', start: '20:30', end: '21:00', title: 'Leitura / Estudo dirigido', type: 'estudo' },
-        { id: 'r9', start: '21:00', end: '22:30', title: 'Janela livre — redes sociais', type: 'livre' },
-        { id: 'r10', start: '23:00', end: '23:15', title: 'Journaling + dormir', type: 'rotina' },
-      ],
-      5: [
-        { id: 'r1', start: '05:30', end: '05:45', title: 'Acordar + água + luz solar', type: 'rotina' },
-        { id: 'r3', start: '08:00', end: '12:00', title: 'Trabalho focado', type: 'foco' },
-        { id: 'r4', start: '12:00', end: '13:00', title: 'Almoço + pausa', type: 'rotina' },
-        { id: 'r5', start: '13:00', end: '18:00', title: 'Trabalho focado', type: 'foco' },
-        { id: 'r6', start: '18:30', end: '20:00', title: 'Jiu-jitsu — treino técnico', type: 'treino' },
-        { id: 'r7', start: '20:00', end: '20:30', title: 'Jantar', type: 'rotina' },
-        { id: 'r9', start: '20:30', end: '23:00', title: 'Janela livre — redes sociais', type: 'livre' },
-      ],
-      6: [
-        { id: 'r1', start: '07:30', end: '07:45', title: 'Acordar + água', type: 'rotina' },
-        { id: 'r2', start: '08:00', end: '09:00', title: 'Treino', type: 'treino' },
-        { id: 'r9', start: '10:00', end: '22:00', title: 'Janela livre — redes sociais', type: 'livre' },
-      ],
-      0: [
-        { id: 'r1', start: '09:00', end: '10:00', title: 'Descanso — sem cobrança', type: 'rotina' },
-        { id: 'r2', start: '19:00', end: '20:00', title: 'Revisão semanal', type: 'estudo' },
-        { id: 'r3', start: '20:00', end: '22:30', title: 'Janela livre — redes sociais', type: 'livre' },
+    goalsByYear: {
+      [thisYear]: [
+        {
+          id: 'corpo', title: 'Corpo', color: 'ember',
+          keyResults: [
+            { id: 'kr1', title: 'Faixa roxa no jiu-jitsu', done: false },
+            { id: 'kr2', title: 'Agachar com 100kg × 5', done: false },
+            { id: 'kr3', title: '90% de adesão nos treinos do ano', done: false },
+          ],
+        },
+        {
+          id: 'mente', title: 'Mente', color: 'cyan',
+          keyResults: [
+            { id: 'kr4', title: 'Concluir curso de inglês avançado', done: false },
+            { id: 'kr5', title: 'Ler 24 livros no ano', done: false },
+            { id: 'kr6', title: 'Reduzir tempo de redes para <30min/dia', done: false },
+          ],
+        },
+        {
+          id: 'carreira', title: 'Carreira', color: 'green',
+          keyResults: [
+            { id: 'kr7', title: 'Lançar projeto pessoal', done: false },
+            { id: 'kr8', title: 'Certificação técnica', done: false },
+          ],
+        },
       ],
     },
+
+    // Tarefas recorrentes (estilo agenda): cada uma tem uma regra de repetição.
+    // recurrence: 'daily' | 'weekly' (usa days:[0-6]) | 'once' (usa date:'YYYY-MM-DD')
+    routineTasks: [
+      { id: 't01', title: 'Acordar + água + luz solar', type: 'rotina', start: '05:30', end: '05:45', recurrence: 'weekly', days: [1, 2, 3, 4, 5] },
+      { id: 't02', title: 'Trabalho focado', type: 'foco', start: '08:00', end: '12:00', recurrence: 'weekly', days: [1, 2, 3, 4, 5] },
+      { id: 't03', title: 'Almoço + pausa', type: 'rotina', start: '12:00', end: '13:00', recurrence: 'weekly', days: [1, 2, 3, 4, 5] },
+      { id: 't04', title: 'Trabalho focado', type: 'foco', start: '13:00', end: '18:00', recurrence: 'weekly', days: [1, 2, 3, 4, 5] },
+      { id: 't05', title: 'Jantar', type: 'rotina', start: '20:00', end: '20:30', recurrence: 'weekly', days: [1, 2, 3, 4, 5] },
+      { id: 't06', title: 'Journaling + dormir', type: 'rotina', start: '23:00', end: '23:15', recurrence: 'weekly', days: [1, 2, 3, 4, 5] },
+
+      { id: 't07', title: 'Treino', type: 'treino', start: '06:00', end: '07:00', recurrence: 'weekly', days: [1, 2] },
+      { id: 't08', title: 'Leitura / Estudo dirigido', type: 'estudo', start: '20:30', end: '21:30', recurrence: 'weekly', days: [1, 2] },
+      { id: 't09', title: 'Janela livre — redes sociais', type: 'livre', start: '21:30', end: '22:30', recurrence: 'weekly', days: [1, 2] },
+
+      { id: 't10', title: 'Jiu-jitsu — treino técnico', type: 'treino', start: '18:30', end: '20:00', recurrence: 'weekly', days: [3, 5] },
+      { id: 't11', title: 'Leitura / Estudo dirigido', type: 'estudo', start: '20:30', end: '21:30', recurrence: 'weekly', days: [3, 5] },
+      { id: 't12', title: 'Janela livre — redes sociais', type: 'livre', start: '21:30', end: '22:30', recurrence: 'weekly', days: [3, 5] },
+
+      { id: 't13', title: 'Leitura / Estudo dirigido', type: 'estudo', start: '20:30', end: '21:00', recurrence: 'weekly', days: [4] },
+      { id: 't14', title: 'Janela livre — redes sociais', type: 'livre', start: '21:00', end: '22:30', recurrence: 'weekly', days: [4] },
+
+      { id: 't15', title: 'Acordar + água', type: 'rotina', start: '07:30', end: '07:45', recurrence: 'weekly', days: [6] },
+      { id: 't16', title: 'Treino', type: 'treino', start: '08:00', end: '09:00', recurrence: 'weekly', days: [6] },
+      { id: 't17', title: 'Janela livre — redes sociais', type: 'livre', start: '10:00', end: '22:00', recurrence: 'weekly', days: [6] },
+
+      { id: 't18', title: 'Descanso — sem cobrança', type: 'rotina', start: '09:00', end: '10:00', recurrence: 'weekly', days: [0] },
+      { id: 't19', title: 'Revisão semanal', type: 'estudo', start: '19:00', end: '20:00', recurrence: 'weekly', days: [0] },
+      { id: 't20', title: 'Janela livre — redes sociais', type: 'livre', start: '20:00', end: '22:30', recurrence: 'weekly', days: [0] },
+    ],
+    taskExceptions: {}, // { 'YYYY-MM-DD': { taskId: true } } — remove uma ocorrência sem apagar a regra
 
     lockApps: [
       { id: 'ig', name: 'Instagram', blocked: true },
@@ -141,7 +114,9 @@ function seedState() {
       { id: 'yt', name: 'YouTube', blocked: false },
     ],
 
+    // Plano de treino por dia da semana (0=domingo ... 6=sábado). null = dia de descanso ("off").
     workoutPlans: {
+      0: null,
       1: { name: 'Full Body A', exercises: [
         { name: 'Agachamento livre', sets: '4×8' },
         { name: 'Puxada frente', sets: '4×10' },
@@ -157,6 +132,9 @@ function seedState() {
         { name: 'Levantamento terra romeno', sets: '3×10' },
         { name: 'Prancha', sets: '3×45s' },
       ]},
+      3: null,
+      4: null,
+      5: null,
       6: { name: 'Full Body C', exercises: [
         { name: 'Levantamento terra', sets: '4×6' },
         { name: 'Elevação pélvica', sets: '4×10' },
@@ -165,7 +143,7 @@ function seedState() {
         { name: 'Prancha lateral', sets: '3×30s' },
       ]},
     },
-    workoutLog: {}, // { 'YYYY-MM-DD': { exercisesDone: [idx,...], feeling, note, jiuJitsu: bool, completed: bool } }
+    workoutLog: {}, // { 'YYYY-MM-DD': { exercisesDone: [idx,...], feeling, note, completed: bool } }
 
     studyTrack: { title: 'Inglês avançado', module: 6, totalModules: 8, nextTopic: 'Conversação técnica' },
     currentBook: { title: 'Hábitos Atômicos', author: 'James Clear', pageCurrent: 112, pageTotal: 254 },
@@ -173,7 +151,7 @@ function seedState() {
     dailyReadingGoalMin: 20,
     readingLog: {}, // { 'YYYY-MM-DD': minutes }
 
-    completionLog: {}, // { 'YYYY-MM-DD': { blockId: true } }
+    completionLog: {}, // { 'YYYY-MM-DD': { taskId: true } }
     emergencyLog: {}, // { 'YYYY-MM-DD': { reason, at } }
 
     finance: {
@@ -238,17 +216,64 @@ export function exportData() {
 // não parecer um backup do Forja, para não sobrescrever dados com lixo.
 export function importData(jsonString) {
   const parsed = JSON.parse(jsonString);
-  if (!parsed || typeof parsed !== 'object' || !parsed.finance || !parsed.goals) {
+  if (!parsed || typeof parsed !== 'object' || !parsed.finance || !parsed.goalsByYear) {
     throw new Error('Arquivo não parece ser um backup válido do Forja.');
   }
   state = parsed;
   persist(state);
 }
 
-// ---------- routine / streak ----------
+// ---------- rotina (tarefas recorrentes) ----------
+export function tasksForDate(dateISO) {
+  const dow = dowOf(dateISO);
+  return state.routineTasks
+    .filter((t) => {
+      if (state.taskExceptions[dateISO] && state.taskExceptions[dateISO][t.id]) return false;
+      if (t.recurrence === 'once') return t.date === dateISO;
+      if (t.recurrence === 'daily') return true;
+      if (t.recurrence === 'weekly') return (t.days || []).includes(dow);
+      return false;
+    })
+    .sort((a, b) => a.start.localeCompare(b.start));
+}
+
 export function todaysBlocks(d = new Date()) {
-  const weekday = d.getDay();
-  return state.routine[weekday] || [];
+  return tasksForDate(todayISO(d));
+}
+
+export function addRoutineTask({ title, type, start, end, recurrence, days, date }) {
+  const task = {
+    id: uid('task'), title, type, start, end, recurrence,
+    days: recurrence === 'weekly' ? (days || []) : [],
+    date: recurrence === 'once' ? date : null,
+  };
+  state.routineTasks.push(task);
+  save();
+  return task.id;
+}
+
+export function updateRoutineTask(id, patch) {
+  const t = state.routineTasks.find((x) => x.id === id);
+  if (t) Object.assign(t, patch);
+  save();
+}
+
+// Remove só a ocorrência deste dia, mantendo a regra recorrente intacta.
+export function removeTaskOccurrence(taskId, dateISO) {
+  if (!state.taskExceptions[dateISO]) state.taskExceptions[dateISO] = {};
+  state.taskExceptions[dateISO][taskId] = true;
+  save();
+}
+
+// Apaga a tarefa/regra inteira (todas as ocorrências, passadas e futuras).
+export function deleteRoutineTask(taskId) {
+  state.routineTasks = state.routineTasks.filter((t) => t.id !== taskId);
+  save();
+}
+
+export function weekdayHasTreino(dow) {
+  return state.routineTasks.some((t) => t.type === 'treino'
+    && ((t.recurrence === 'weekly' && (t.days || []).includes(dow)) || t.recurrence === 'daily'));
 }
 
 export function isBlockDone(dateISO, blockId) {
@@ -292,7 +317,6 @@ export function isDayFullyDone(dateISO, d = new Date()) {
 export function currentStreak(d = new Date()) {
   let streak = 0;
   const cursor = new Date(d);
-  // if today isn't finished yet, start counting from yesterday but don't penalize an in-progress day
   if (!isDayFullyDone(todayISO(cursor), cursor)) {
     cursor.setDate(cursor.getDate() - 1);
   }
@@ -331,23 +355,87 @@ export function socialLockActive(d = new Date()) {
   return !unlocked;
 }
 
-// ---------- goals ----------
+// ---------- metas (por ano) ----------
+function ensureYearGoals(year) {
+  if (!state.goalsByYear[year]) {
+    state.goalsByYear[year] = [
+      { id: 'corpo', title: 'Corpo', color: 'ember', keyResults: [] },
+      { id: 'mente', title: 'Mente', color: 'cyan', keyResults: [] },
+      { id: 'carreira', title: 'Carreira', color: 'green', keyResults: [] },
+    ];
+    save();
+  }
+  return state.goalsByYear[year];
+}
+
+export function availableYears() {
+  const now = new Date().getFullYear();
+  const years = new Set();
+  for (let y = now - 1; y <= now + 4; y++) years.add(String(y));
+  Object.keys(state.goalsByYear).forEach((y) => years.add(y));
+  return Array.from(years).sort();
+}
+
+export function getGoalsForYear(year) {
+  return ensureYearGoals(year);
+}
+
 export function goalProgress(goal) {
   const total = goal.keyResults.length;
   const done = goal.keyResults.filter((k) => k.done).length;
   return total ? done / total : 0;
 }
 
-export function toggleKeyResult(goalId, krId) {
-  const goal = state.goals.find((g) => g.id === goalId);
+export function toggleKeyResult(year, goalId, krId) {
+  const goal = ensureYearGoals(year).find((g) => g.id === goalId);
   const kr = goal.keyResults.find((k) => k.id === krId);
   kr.done = !kr.done;
+  save();
+}
+
+export function addKeyResult(year, goalId, title) {
+  const goal = ensureYearGoals(year).find((g) => g.id === goalId);
+  goal.keyResults.push({ id: uid('kr'), title, done: false });
+  save();
+}
+
+export function removeKeyResult(year, goalId, krId) {
+  const goal = ensureYearGoals(year).find((g) => g.id === goalId);
+  goal.keyResults = goal.keyResults.filter((k) => k.id !== krId);
   save();
 }
 
 // ---------- treino ----------
 export function todaysWorkoutPlan(d = new Date()) {
   return state.workoutPlans[d.getDay()] || null;
+}
+
+export function setWorkoutPlanForDay(dow, plan) {
+  state.workoutPlans[dow] = plan; // null = dia off
+  save();
+}
+
+export function renameWorkoutPlan(dow, name) {
+  if (state.workoutPlans[dow]) state.workoutPlans[dow].name = name;
+  save();
+}
+
+export function addExerciseToPlan(dow, exercise) {
+  if (!state.workoutPlans[dow]) state.workoutPlans[dow] = { name: 'Treino', exercises: [] };
+  state.workoutPlans[dow].exercises.push(exercise);
+  save();
+}
+
+export function updateExerciseInPlan(dow, idx, patch) {
+  const plan = state.workoutPlans[dow];
+  if (plan && plan.exercises[idx]) Object.assign(plan.exercises[idx], patch);
+  save();
+}
+
+export function removeExerciseFromPlan(dow, idx) {
+  const plan = state.workoutPlans[dow];
+  if (plan) plan.exercises.splice(idx, 1);
+  save();
 }
 
 export function toggleExerciseDone(dateISO, idx) {
@@ -373,7 +461,7 @@ export function completeWorkout(dateISO) {
   const log = state.workoutLog[dateISO] || (state.workoutLog[dateISO] = { exercisesDone: [] });
   log.completed = true;
   save();
-  const block = todaysBlocks().find((b) => b.type === 'treino');
+  const block = tasksForDate(dateISO).find((b) => b.type === 'treino');
   if (block && !isBlockDone(dateISO, block.id)) toggleBlockDone(dateISO, block.id);
 }
 
@@ -396,7 +484,7 @@ export function weekWorkoutSummary(d = new Date()) {
 export function weeksStreak(d = new Date()) {
   let weeks = 0;
   const cursor = new Date(d);
-  cursor.setDate(cursor.getDate() - 7); // conta semanas passadas e completas
+  cursor.setDate(cursor.getDate() - 7);
   for (let i = 0; i < 104; i++) {
     const { planned, done } = weekWorkoutSummary(cursor);
     const ok = planned === 0 || done / planned >= 0.8;
@@ -408,11 +496,44 @@ export function weeksStreak(d = new Date()) {
 }
 
 // ---------- estudos ----------
+export function updateStudyTrack(patch) {
+  Object.assign(state.studyTrack, patch);
+  save();
+}
+
+export function updateCurrentBook(patch) {
+  Object.assign(state.currentBook, patch);
+  save();
+}
+
+export function setDailyReadingGoal(minutes) {
+  state.dailyReadingGoalMin = minutes;
+  save();
+}
+
+export function addBookToQueue(title) {
+  state.bookQueue.push({ title });
+  save();
+}
+
+export function removeBookFromQueue(idx) {
+  state.bookQueue.splice(idx, 1);
+  save();
+}
+
+export function startBookFromQueue(idx) {
+  const next = state.bookQueue[idx];
+  if (!next) return;
+  state.currentBook = { title: next.title, author: next.author || '', pageCurrent: 0, pageTotal: next.pageTotal || 0 };
+  state.bookQueue.splice(idx, 1);
+  save();
+}
+
 export function logReading(dateISO, minutes) {
   state.readingLog[dateISO] = (state.readingLog[dateISO] || 0) + minutes;
   save();
   if (state.readingLog[dateISO] >= state.dailyReadingGoalMin) {
-    const block = todaysBlocks().find((b) => b.type === 'estudo');
+    const block = tasksForDate(dateISO).find((b) => b.type === 'estudo');
     if (block && !isBlockDone(dateISO, block.id)) toggleBlockDone(dateISO, block.id);
   }
 }
@@ -423,7 +544,7 @@ export function cardInvoiceForMonth(cardId, ym = monthKey()) {
     .filter((c) => c.cardId === cardId)
     .reduce((sum, c) => {
       const monthly = c.totalAmount / c.installments;
-      const idx = monthsBetween(c.startMonth, ym); // 0-based installment index for this month
+      const idx = monthsBetween(c.startMonth, ym);
       if (idx >= 0 && idx < c.installments) return sum + monthly;
       return sum;
     }, 0);
@@ -436,25 +557,83 @@ export function chargeRemainingInstallments(charge, ym = monthKey()) {
 
 export function addCardCharge({ cardId, desc, totalAmount, installments }) {
   state.finance.cardCharges.push({
-    id: 'c' + Date.now(), cardId, desc, totalAmount, installments, startMonth: monthKey(),
+    id: uid('charge'), cardId, desc, totalAmount, installments, startMonth: monthKey(),
   });
+  save();
+}
+
+export function removeCardCharge(id) {
+  state.finance.cardCharges = state.finance.cardCharges.filter((c) => c.id !== id);
+  save();
+}
+
+export function addCard({ name, limit, dueDay }) {
+  state.finance.cards.push({ id: uid('card'), name, limit, dueDay });
+  save();
+}
+
+export function updateCard(id, patch) {
+  const c = state.finance.cards.find((x) => x.id === id);
+  if (c) Object.assign(c, patch);
+  save();
+}
+
+export function removeCard(id) {
+  state.finance.cards = state.finance.cards.filter((c) => c.id !== id);
+  state.finance.cardCharges = state.finance.cardCharges.filter((c) => c.cardId !== id);
   save();
 }
 
 export function addLoan({ name, bank, totalAmount, installments, monthlyAmount }) {
   state.finance.loans.push({
-    id: 'l' + Date.now(), name, bank, totalAmount, installments, paidInstallments: 0,
+    id: uid('loan'), name, bank, totalAmount, installments, paidInstallments: 0,
     monthlyAmount: monthlyAmount || Math.round((totalAmount / installments) * 100) / 100,
   });
+  save();
+}
+
+export function updateLoan(id, patch) {
+  const l = state.finance.loans.find((x) => x.id === id);
+  if (l) Object.assign(l, patch);
+  save();
+}
+
+export function removeLoan(id) {
+  state.finance.loans = state.finance.loans.filter((l) => l.id !== id);
+  save();
+}
+
+export function addFixedBill({ name, amount, dueDay }) {
+  state.finance.fixedBills.push({ id: uid('bill'), name, amount, dueDay });
+  save();
+}
+
+export function updateFixedBill(id, patch) {
+  const b = state.finance.fixedBills.find((x) => x.id === id);
+  if (b) Object.assign(b, patch);
+  save();
+}
+
+export function removeFixedBill(id) {
+  state.finance.fixedBills = state.finance.fixedBills.filter((b) => b.id !== id);
+  save();
+}
+
+export function updateLis(patch) {
+  Object.assign(state.finance.lis, patch);
+  save();
+}
+
+export function updateBudget(amount) {
+  state.profile.budgetMensal = amount;
   save();
 }
 
 export function addVariableExpense({ amount, category, method }) {
   const ym = monthKey();
   if (!state.finance.variableSpend[ym]) state.finance.variableSpend[ym] = [];
-  if (method === 'cartao_id_pending') return; // guarded — handled via addCardCharge by caller
   state.finance.variableSpend[ym].push({
-    id: 'v' + Date.now(), date: todayISO(), amount, category, method,
+    id: uid('spend'), date: todayISO(), amount, category, method,
   });
   save();
 }
@@ -476,7 +655,6 @@ export function togglePaid(ym, key) {
   const wasPaid = !!state.finance.monthlyPayments[ym][key];
   state.finance.monthlyPayments[ym][key] = !wasPaid;
 
-  // paying off a loan installment for the first time advances its counter
   if (key.startsWith('loan:')) {
     const loanId = key.slice(5);
     const loan = state.finance.loans.find((l) => l.id === loanId);
