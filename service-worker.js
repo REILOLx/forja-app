@@ -1,10 +1,11 @@
-const CACHE_NAME = 'forja-cache-v7';
+const CACHE_NAME = 'forja-cache-v8';
 const ASSETS = [
   './',
   './index.html',
   './manifest.webmanifest',
   './css/styles.css',
   './js/app.js',
+  './js/updates.js',
   './js/router.js',
   './js/store.js',
   './js/icons.js',
@@ -35,14 +36,16 @@ const ASSETS = [
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS)).then(() => self.skipWaiting())
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(
+      ASSETS.map(asset => new Request(new URL(asset, self.location.href), { cache: 'reload' }))
+    )).then(() => self.skipWaiting())
   );
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+      Promise.all(keys.filter((k) => k.startsWith('forja-cache-') && k !== CACHE_NAME).map((k) => caches.delete(k)))
     ).then(() => self.clients.claim())
   );
 });
@@ -55,7 +58,7 @@ self.addEventListener('fetch', (event) => {
 
   event.respondWith((async () => {
     try {
-      const res = await fetch(req);
+      const res = await fetch(req, { cache: 'no-store' });
       if (res.ok) {
         const copy = res.clone();
         event.waitUntil(

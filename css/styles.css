@@ -325,6 +325,8 @@ h2 { font-size: 17px; font-weight: 700; }
 }
 
 [hidden] { display: none !important; }
+.app-update { position: fixed; z-index: 30; bottom: 90px; left: 50%; transform: translateX(-50%); width: min(430px, calc(100% - 32px)); padding: 18px; background: var(--surface-3); color: var(--text); border: 1px solid var(--ember-border); border-radius: 16px; box-shadow: 0 12px 40px #0006; font-size: 13px; line-height: 1.6; }
+.app-update button { margin-top: 12px; }
 
 .recurring-option { display:flex; align-items:flex-start; gap:12px; padding:16px; border:1px solid var(--ember-border); border-radius:14px; background:var(--ember-bg); cursor:pointer; }
 .recurring-option input { flex-shrink:0; margin-top:2px; }

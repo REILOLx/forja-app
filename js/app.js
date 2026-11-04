@@ -272,9 +272,3 @@ sb.auth.onAuthStateChange((_event, session) => {
   }, 0);
 });
 render();
-
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./service-worker.js').catch(() => {});
-  });
-}
