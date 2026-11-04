@@ -15,12 +15,12 @@ export function render() {
   const goals = getGoalsForYear(selectedYear);
 
   return `
-    <div class="fjc" style="font-size:22px;font-weight:700;">Metas</div>
+    <div><div class="eyebrow">Intenção que vira direção</div><h1>Metas</h1><p class="page-description">Defina resultados claros e reconheça cada conquista.</p></div>
 
     <div class="row gap-8" style="overflow-x:auto;justify-content:flex-start;padding-bottom:2px;flex-shrink:0;">
       ${years.map((y) => `
         <button data-select-year="${y}" class="pill" style="flex-shrink:0;${y === selectedYear
-          ? 'background:var(--ember-bg);border:1px solid var(--ember-border);color:oklch(0.85 0.1 55);'
+          ? 'background:var(--ember-bg);border:1px solid var(--ember-border);color:var(--ember);'
           : 'background:var(--surface-3);color:var(--text-dim);border:1px solid transparent;'}">${y}</button>
       `).join('')}
     </div>
@@ -32,7 +32,7 @@ export function render() {
         <div class="card">
           <div class="row gap-10" style="margin-bottom:12px;justify-content:flex-start;">
             <span style="width:19px;height:19px;color:${c.text};display:flex;">${icon[ICONS[goal.id]] ? icon[ICONS[goal.id]]() : icon.target()}</span>
-            <span class="fjc" style="font-size:15.5px;font-weight:700;">${goal.title}</span>
+            <span class="fjc" style="font-size:15.5px;font-weight:700;flex:1">${goal.title}</span><span class="pill pill-green">${goal.keyResults.filter(k=>k.done).length}/${goal.keyResults.length} · ${pct}%</span>
           </div>
           <div class="progress-track" style="margin-bottom:14px;"><div class="progress-fill" style="width:${pct}%;background:${c.fill};"></div></div>
           <div class="stack gap-8">

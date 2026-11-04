@@ -15,7 +15,7 @@ export function render(state) {
   const trackPct = track.totalModules ? Math.round((track.module / track.totalModules) * 100) : 0;
 
   return `
-    <div class="fjc" style="font-size:22px;font-weight:700;">Estudos</div>
+    <div><div class="eyebrow">Conhecimento que se acumula</div><h1>Estudos</h1><p class="page-description">Um pouco de leitura. Um passo na sua trilha.</p></div>
 
     <div>
       <div class="row" style="margin-bottom:10px;">
@@ -89,7 +89,7 @@ export function render(state) {
           </div>
         ` : `
           <div class="row gap-14">
-            <div style="width:46px;height:64px;border-radius:5px;background:oklch(0.3 0.06 55);flex-shrink:0;"></div>
+            <div style="width:46px;height:64px;border-radius:5px;background:var(--ember-bg);flex-shrink:0;"></div>
             <div style="flex:1;">
               <div style="font-size:14px;font-weight:700;">${book.title}</div>
               <div class="muted" style="font-size:12px;margin-bottom:8px;">${book.author}</div>
@@ -101,6 +101,7 @@ export function render(state) {
       </div>
     </div>
 
+    <div class="card stack gap-10"><h2>Registrar progresso</h2><div class="form-grid"><label class="field">Página atual<input id="quick-page" type="number" min="0" max="${book.pageTotal || 100000}" value="${book.pageCurrent}"></label><label class="field">Módulos concluídos<input id="quick-module" type="number" min="0" max="${track.totalModules}" value="${track.module}"></label></div><button id="save-study-progress" class="btn btn-primary">Salvar progresso</button><p class="hint">Os minutos de leitura são registrados na meta diária acima.</p></div>
     <div>
       <div class="row" style="margin-bottom:10px;">
         <span class="section-label" style="margin:0;">Na fila</span>
@@ -126,6 +127,12 @@ export function render(state) {
 
 export function afterRender(container, { render }) {
   const store = window.__forja.store;
+  container.querySelector('#save-study-progress').addEventListener('click', () => {
+    const page = container.querySelector('#quick-page'), module = container.querySelector('#quick-module');
+    if (!page.reportValidity() || !module.reportValidity()) return;
+    store.updateCurrentBook({ pageCurrent: Number(page.value) });
+    store.updateStudyTrack({ module: Number(module.value) }); render();
+  });
 
   const goalBtn = container.querySelector('#btn-edit-goal');
   if (goalBtn) goalBtn.addEventListener('click', () => { editingGoal = !editingGoal; render(); });

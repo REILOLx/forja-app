@@ -85,12 +85,12 @@ function renderAddForm(iso) {
       <div class="section-label" style="margin:0;">Nova tarefa</div>
       <input type="text" data-field="title" placeholder="Título">
       <div class="row gap-8">
-        <input type="text" data-field="start" placeholder="Início (HH:MM)" value="08:00" style="flex:1;">
-        <input type="text" data-field="end" placeholder="Fim (HH:MM)" value="09:00" style="flex:1;">
+        <input type="time" aria-label="Horário de início" data-field="start" placeholder="Início (HH:MM)" value="08:00" style="flex:1;">
+        <input type="time" aria-label="Horário de término" data-field="end" placeholder="Fim (HH:MM)" value="09:00" style="flex:1;">
       </div>
       <select data-field="type">
         <option value="rotina">Rotina</option>
-        <option value="foco">Foco (bloqueia redes)</option>
+        <option value="foco">Foco (período de concentração)</option>
         <option value="treino">Treino</option>
         <option value="estudo">Estudo</option>
         <option value="livre">Janela livre (redes)</option>

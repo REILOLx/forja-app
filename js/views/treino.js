@@ -15,7 +15,7 @@ export function render(state) {
   const summary = weekWorkoutSummary(now);
 
   const strip = [0, 1, 2, 3, 4, 5, 6].map((dow) => {
-    const hasTreino = weekdayHasTreino(dow);
+    const hasTreino = !!state.workoutPlans[dow];
     const isToday = dow === todayDow;
     let bg = 'var(--surface-3)', content;
     if (!hasTreino) {
@@ -25,18 +25,18 @@ export function render(state) {
     }
     if (isToday) bg = 'var(--ember-bg)';
     return `
-      <div class="stack gap-8" style="align-items:center;">
+      <button data-toggle-edit-dow="${dow}" aria-label="Editar treino de ${weekdayLabel(dow)}" class="stack gap-8" style="align-items:center;border:0;background:none;padding:0;">
         <span style="font-size:10.5px;color:var(--text-dim);">${DAY_ABBR[dow]}</span>
         <div style="width:32px;height:32px;border-radius:8px;background:${bg};${isToday ? 'border:1.5px solid var(--ember);' : ''}display:flex;align-items:center;justify-content:center;">
           ${content}
         </div>
-      </div>`;
+      </button>`;
   }).join('');
 
   return `
     <div class="row">
       <div class="fjc" style="font-size:22px;font-weight:700;">Treino</div>
-      <span class="muted" style="font-size:12px;">toque num dia abaixo pra editar</span>
+      <span class="muted" style="font-size:12px;">Selecione um dia para editar</span>
     </div>
     <div class="grid-3" style="grid-template-columns:repeat(7, minmax(0, 1fr));">${strip}</div>
 
@@ -44,7 +44,7 @@ export function render(state) {
       <div class="card" style="border-color:var(--ember-border);">
         <div class="row" style="margin-bottom:14px;align-items:flex-start;">
           <div>
-            <div class="section-label" style="margin:0;color:oklch(0.8 0.1 55);">Hoje</div>
+            <div class="section-label" style="margin:0;color:var(--ember);">Hoje</div>
             <div class="fjc" style="font-size:18px;font-weight:700;">${plan.name}</div>
           </div>
         </div>
@@ -58,7 +58,7 @@ export function render(state) {
         </div>
         ${log && log.completed
           ? `<div class="pill pill-green" style="display:inline-block;margin-top:14px;">Treino concluído hoje</div>`
-          : `<a href="#/treino/verificacao" class="btn btn-primary" style="display:block;text-align:center;margin-top:14px;text-decoration:none;">Iniciar verificação →</a>`}
+          : `<a href="#/treino/verificacao" class="btn btn-primary" style="display:block;text-align:center;margin-top:14px;text-decoration:none;">Iniciar treino →</a>`}
       </div>
     ` : `
       <div class="card" style="text-align:center;">

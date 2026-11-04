@@ -39,7 +39,7 @@ export function render(state) {
       </div>
 
       <div>
-        <div class="fjc" style="font-size:22px;font-weight:700;">${locked ? 'Redes bloqueadas' : 'Redes liberadas'}</div>
+        <div class="fjc" style="font-size:22px;font-weight:700;">${locked ? 'Hora de manter o foco' : 'Sua janela livre'}</div>
         <div class="muted" style="font-size:14px;margin-top:8px;max-width:270px;">
           ${locked
             ? (block && block.type === 'foco' ? 'Ainda não. O foco desse bloco vale mais do que o scroll.' : 'Fora da janela livre de hoje.')
@@ -65,22 +65,23 @@ export function render(state) {
         </div>
       ` : ''}
 
+      <p class="hint">O Forja acompanha seus períodos de foco. Para impedir a abertura de outros apps, configure também o Tempo de Uso ou Bem-estar Digital do seu aparelho.</p>
       <div style="width:100%;text-align:left;">
-        <div class="section-label">Apps sob controle</div>
+        <div class="section-label">Seu compromisso de foco</div>
         <div class="stack gap-8">
           ${state.lockApps.map((app) => `
             <div class="row card card-tight">
               <span style="font-size:13.5px;font-weight:600;">${app.name}</span>
-              <span class="pill ${app.blocked && locked ? 'pill-red' : 'pill-green'}">${app.blocked ? (locked ? 'Bloqueado' : 'Liberado') : 'Sem restrição'}</span>
+              <span class="pill ${app.blocked && locked ? 'pill-red' : 'pill-green'}">${app.blocked ? (locked ? 'Evitar agora' : 'Janela livre') : 'Sem restrição'}</span>
             </div>
           `).join('')}
         </div>
       </div>
 
       ${freeWindow ? `
-        <div class="row card card-tight" style="width:100%;border:1px dashed oklch(0.4 0.08 55);background:oklch(0.19 0.03 55 / 0.4);">
+        <div class="row card card-tight" style="width:100%;border:1px dashed var(--ember-bg);background:var(--ember-bg);">
           <div class="stack" style="text-align:left;">
-            <span style="font-size:12.5px;font-weight:700;color:oklch(0.8 0.1 55);">Janela livre de hoje</span>
+            <span style="font-size:12.5px;font-weight:700;color:var(--ember);">Janela livre de hoje</span>
             <span class="muted" style="font-size:12px;">${freeWindow.start} – ${freeWindow.end}</span>
           </div>
           <span style="width:18px;height:18px;color:var(--ember);display:flex;">${icon.clock()}</span>

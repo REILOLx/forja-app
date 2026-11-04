@@ -1,66 +1,30 @@
 import { icon } from '../icons.js';
-import {
-  monthKey, cardInvoiceForMonth, isPaid, activeLoanBalance, formatMoney,
-} from '../store.js';
-
-function checkRow(checked, label, sub, amount, action, key, ym) {
-  return `
-    <button data-action="togglePaid" data-key="${key}" data-ym="${ym}"
-      class="check-row ${checked ? 'done' : ''}" style="width:100%;text-align:left;">
-      <span class="check ${checked ? 'checked' : ''}">${icon.check()}</span>
-      <span class="stack" style="flex:1;">
-        <span class="label" style="${checked ? '' : 'text-decoration:none;color:var(--text);'}">${label}</span>
-        ${sub ? `<span class="muted" style="font-size:11px;">${sub}</span>` : ''}
-      </span>
-      <span class="fjc" style="font-size:13.5px;font-weight:700;${checked ? 'color:var(--text-dim);' : ''}">${formatMoney(amount)}</span>
-    </button>`;
-}
-
+import * as store from '../store.js';
+import { financeHeading, monthPicker, bindMonthPicker, monthLabel, escapeHTML as esc, toast } from '../ui.js';
 export function render(state) {
-  const ym = monthKey();
-  const f = state.finance;
-  const monthLabel = new Intl.DateTimeFormat('pt-BR', { month: 'long' }).format(new Date());
-
-  const items = [];
-  f.fixedBills.forEach((b) => items.push({ key: `bill:${b.id}`, label: b.name, amount: b.amount, group: 'Contas fixas', sub: `vence dia ${b.dueDay}` }));
-  f.cards.forEach((c) => {
-    const amt = cardInvoiceForMonth(c.id, ym);
-    if (amt > 0) items.push({ key: `card:${c.id}`, label: `Fatura ${c.name}`, amount: amt, group: 'Faturas de cartão', sub: `vence dia ${c.dueDay}` });
-  });
-  f.loans.filter((l) => activeLoanBalance(l) > 0).forEach((l) => {
-    items.push({ key: `loan:${l.id}`, label: `${l.name} · ${l.bank}`, amount: l.monthlyAmount, group: 'Empréstimos', sub: `parcela ${l.paidInstallments + 1} de ${l.installments}` });
-  });
-  if (f.lis.used > 0) items.push({ key: 'lis', label: 'Pagamento mínimo do especial', amount: f.lis.used, group: 'LIS · limite especial', sub: '' });
-
-  let paidTotal = 0, pendingTotal = 0;
-  items.forEach((it) => { if (isPaid(ym, it.key)) paidTotal += it.amount; else pendingTotal += it.amount; });
-
-  const groups = [...new Set(items.map((i) => i.group))];
-
-  return `
-    <div class="row" style="gap:12px;justify-content:flex-start;">
-      <a href="#/financeiro" style="width:20px;height:20px;color:var(--text-dim);display:flex;">${icon.back()}</a>
-      <div class="fjc" style="font-size:18px;font-weight:700;">Pagamentos de ${monthLabel}</div>
-    </div>
-
-    <div class="row gap-10">
-      <div class="card" style="flex:1;">
-        <div class="fjc" style="font-size:17px;font-weight:700;color:var(--green);">${formatMoney(paidTotal)}</div>
-        <div class="muted" style="font-size:11px;">já pago</div>
-      </div>
-      <div class="card" style="flex:1;">
-        <div class="fjc" style="font-size:17px;font-weight:700;color:var(--red);">${formatMoney(pendingTotal)}</div>
-        <div class="muted" style="font-size:11px;">ainda a pagar</div>
-      </div>
-    </div>
-
-    ${groups.map((g) => `
-      <div>
-        <div class="section-label">${g}</div>
-        <div class="stack gap-8">
-          ${items.filter((i) => i.group === g).map((it) => checkRow(isPaid(ym, it.key), it.label, it.sub, it.amount, 'togglePaid', it.key, ym)).join('')}
-        </div>
-      </div>
-    `).join('') || '<div class="muted">Nada lançado para este mês ainda.</div>'}
-  `;
+ const ym=store.selectedFinanceMonth(), f=state.finance;
+ const items=[];
+ store.fixedBillsForMonth(ym).forEach(b=>items.push({key:'bill:'+b.id,label:b.name,amount:b.amount,group:'Contas fixas',sub:'Vence dia '+b.dueDay}));
+ f.cards.forEach(c=>{const amount=store.cardInvoiceForMonth(c.id,ym);if(amount>0)items.push({key:'card:'+c.id,label:'Fatura '+c.name,amount,group:'Cartões',sub:'Vence dia '+c.dueDay});});
+ f.loans.forEach(l=>{const amount=store.loanAmountForMonth(l,ym);if(amount>0)items.push({key:'loan:'+l.id,label:l.name,amount,group:'Empréstimos',sub:`Parcela ${store.monthsBetween(l.startMonth,ym)+1} de ${l.installments}`});});
+ const lis=store.lisForMonth(ym);if(lis.used>0)items.push({key:'lis',label:'Especial provisionado',amount:lis.used,group:'Limite especial',sub:'Valor integral registrado · sem juros estimados'});
+ store.financeEntries(ym).filter(e=>e.type==='expense').forEach(e=>items.push({key:e.id,label:e.description,amount:e.amount,group:'Despesas lançadas',sub:e.date.slice(8)+'/'+e.date.slice(5,7),entry:true,paid:e.status==='confirmed'}));
+ (f.variableSpend[ym]||[]).forEach(e=>items.push({key:e.id,label:e.desc||e.category,amount:e.amount,group:'Despesas lançadas',sub:'Registro anterior · pago',paid:true,legacy:true}));
+ const paid=it=>it.entry||it.legacy?it.paid:store.isPaid(ym,it.key);
+ const total=(list)=>list.reduce((s,it)=>s+Math.round(it.amount*100),0)/100;
+ return `${financeHeading('Pagamentos','Confira o que foi pago e o que ainda está previsto.')}${monthPicker()}
+ <div class="grid-2"><div class="metric"><span>Pago em ${monthLabel(ym,true)}</span><strong class="positive">${store.formatMoney(total(items.filter(paid)))}</strong></div><div class="metric"><span>A pagar no mês</span><strong>${store.formatMoney(total(items.filter(it=>!paid(it))))}</strong></div></div>
+ ${[...new Set(items.map(i=>i.group))].map(g=>`<section class="finance-section"><h2>${g}</h2>${items.filter(it=>it.group===g).map(it=>`<button class="check-row ${paid(it)?'done':''}" style="text-align:left" ${it.legacy?'disabled':''} data-payment-key="${it.key}" data-payment-entry="${!!it.entry}"><span class="check ${paid(it)?'checked':''}">${icon.check()}</span><span class="stack" style="flex:1"><span class="label">${esc(it.label)}</span><span class="hint">${esc(it.sub)}</span></span><strong class="fjc" style="font-size:14px">${store.formatMoney(it.amount)}</strong></button>`).join('')}</section>`).join('')||'<div class="empty-state"><strong>Mês sem compromissos</strong><p>Cadastre contas fixas ou uma nova despesa para começar.</p></div>'}`;
+}
+export function afterRender(container,{render}) {
+ bindMonthPicker(container,render);
+ container.querySelectorAll('[data-payment-key]').forEach(el=>el.addEventListener('click',()=>{
+  const ym=store.selectedFinanceMonth();
+  if(ym>store.monthKey()){toast('Pagamentos futuros permanecem previstos.');return;}
+  if(el.dataset.paymentEntry==='true'){
+   const e=store.financeEntries(ym).find(e=>e.id===el.dataset.paymentKey);
+   store.updateFinanceOccurrence(e.id,ym,{status:e.status==='confirmed'?'planned':'confirmed'});
+  }else store.togglePaid(ym,el.dataset.paymentKey);
+  render();
+ }));
 }

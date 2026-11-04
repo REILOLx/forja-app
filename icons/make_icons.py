@@ -5,26 +5,26 @@ def make_icon(size, path):
     img = Image.new("RGB", (size, size), (0, 0, 0))
     d = ImageDraw.Draw(img)
 
-    # background: near-black cool tone (matches --bg)
-    bg = (18, 18, 22)
+    # background: deep forest green (matches --bg)
+    bg = (7, 19, 15)
     d.rectangle([0, 0, size, size], fill=bg)
 
-    # radial-ish warm glow behind the flame
+    # radial forest glow behind the flame
     cx, cy = size * 0.5, size * 0.5
     glow_r = int(size * 0.42)
     for i in range(glow_r, 0, -2):
         t = i / glow_r
         alpha_col = (
-            int(60 + (1 - t) * 40),
-            int(28 + (1 - t) * 14),
-            int(14),
+            int(20 + (1 - t) * 14),
+            int(42 + (1 - t) * 22),
+            int(28 + (1 - t) * 12),
         )
         bbox = [cx - i, cy - i, cx + i, cy + i]
         d.ellipse(bbox, fill=alpha_col)
 
     # flame shape (simple stylized path), ember color
-    ember = (222, 133, 58)  # approx oklch(0.75 0.17 55) in sRGB
-    ember_dark = (168, 88, 30)
+    ember = (163, 217, 172)
+    ember_dark = (41, 88, 56)
 
     s = size
     flame = [

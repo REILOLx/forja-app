@@ -1,6 +1,8 @@
 import { icon } from '../icons.js';
 import { activeLoanBalance, formatMoney } from '../store.js';
 
+import { monthPicker, bindMonthPicker } from '../ui.js';
+
 const CIRC = 2 * Math.PI * 15.5;
 let editingLoanId = null;
 let showAddLoan = false;
@@ -29,6 +31,8 @@ export function render(state) {
       <div class="fjc" style="font-size:18px;font-weight:700;">Empréstimos</div>
     </div>
 
+    ${monthPicker()}
+    <p class="hint">O mês selecionado será o início das parcelas de novos empréstimos. Os contratos legados têm o início estimado pela quantidade de parcelas pagas.</p>
     ${loans.map((l) => {
       const pct = l.installments ? l.paidInstallments / l.installments : 0;
       const remaining = activeLoanBalance(l);
@@ -46,6 +50,7 @@ export function render(state) {
           ${isEditing ? `
             <div class="stack gap-8">
               <input type="text" data-loan-field="name" data-loan-id="${l.id}" value="${l.name}" placeholder="Nome">
+              <label class="field">Mês da primeira parcela<input type="month" data-loan-field="startMonth" data-loan-id="${l.id}" value="${l.startMonth}"></label>
               <input type="text" data-loan-field="bank" data-loan-id="${l.id}" value="${l.bank}" placeholder="Banco">
               <div class="row gap-8">
                 <input type="number" data-loan-field="totalAmount" data-loan-id="${l.id}" value="${l.totalAmount}" placeholder="Valor total" style="flex:1;">
@@ -95,6 +100,7 @@ export function render(state) {
 }
 
 export function afterRender(container, { render }) {
+  bindMonthPicker(container, render);
   const store = window.__forja.store;
 
   container.querySelectorAll('[data-toggle-edit-loan]').forEach((btn) => {

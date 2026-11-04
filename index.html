@@ -2,11 +2,11 @@
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Forja</title>
 
   <link rel="manifest" href="manifest.webmanifest">
-  <meta name="theme-color" content="#0e0e11">
+  <meta name="theme-color" content="#07130f">
 
   <!-- iOS: Add to Home Screen as a standalone, full-screen app -->
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -18,7 +18,9 @@
   <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-  <div id="view"></div>
+  <header class="global-header" id="app-header" hidden><a href="#/home" class="wordmark" aria-label="Forja início">FORJA.</a><a href="#/config">Ajustes e backup ↗</a></header>
+  <div id="sync-status" class="sync-banner" role="status" hidden>Não foi possível sincronizar com a nuvem. As alterações ficam neste navegador. Exporte um backup em Ajustes antes de trocar de dispositivo.</div>
+  <main id="view" aria-label="Conteúdo principal"></main>
   <nav class="navbar" id="navbar"></nav>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>

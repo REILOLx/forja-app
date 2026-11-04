@@ -1,16 +1,17 @@
 import { sb } from './supabase-client.js';
+import { normalizeFinance, billsAt, loanAt, installmentAt, entriesAt, portfolioAt, lisAt, budgetAt, sum } from './finance-model.js';
 
 // ---------- date helpers ----------
 export function todayISO(d = new Date()) {
-  return d.toISOString().slice(0, 10);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 export function monthKey(d = new Date()) {
-  return d.toISOString().slice(0, 7); // YYYY-MM
+  return todayISO(d).slice(0, 7); // mês local, sem virar o dia às 21h
 }
 export function addMonths(ym, n) {
   const [y, m] = ym.split('-').map(Number);
   const d = new Date(Date.UTC(y, m - 1 + n, 1));
-  return monthKey(d);
+  return d.toISOString().slice(0, 7);
 }
 export function monthsBetween(ymStart, ymEnd) {
   const [y1, m1] = ymStart.split('-').map(Number);
@@ -181,7 +182,7 @@ function seedState() {
   };
 }
 
-let state = load();
+let state = normalizeFinance(load(), monthKey());
 
 function load() {
   try {
@@ -202,6 +203,9 @@ export function getState() {
 }
 
 let cloudUserId = null;
+let cloudReady = false;
+let syncStatus = 'local';
+export function cloudSyncStatus() { return syncStatus; }
 let pushTimer = null;
 
 // Chamado pelo app.js assim que o login resolve. Na primeira vez que este
@@ -210,32 +214,38 @@ let pushTimer = null;
 // de partida e sobe para a nuvem. Da segunda vez em diante, a nuvem manda.
 export async function setCloudUser(userId) {
   cloudUserId = userId;
+  cloudReady = false;
+  syncStatus = 'loading';
   if (!userId) return;
   const { data: row, error } = await sb.from('app_state').select('data').eq('user_id', userId).maybeSingle();
-  if (error) { console.error('Supabase (buscar estado):', error.message); return; }
+  if (error) { syncStatus = 'error'; throw error; }
   if (row && row.data) {
-    state = row.data;
+    state = normalizeFinance(row.data, monthKey());
     persist(state);
+    cloudReady = true; syncStatus = 'ready';
   } else {
+    cloudReady = true; syncStatus = 'ready';
     await pushToCloudNow();
   }
 }
 
 export function clearCloudUser() {
   cloudUserId = null;
+  cloudReady = false; syncStatus = 'local';
   clearTimeout(pushTimer);
 }
 
 async function pushToCloudNow() {
-  if (!cloudUserId) return;
+  if (!cloudUserId || !cloudReady) return;
   const { error } = await sb.from('app_state').upsert({
     user_id: cloudUserId, data: state, updated_at: new Date().toISOString(),
   });
-  if (error) console.error('Supabase (salvar estado):', error.message);
+  if (error) { syncStatus = 'error'; console.error('Supabase (salvar estado):', error.message); } else syncStatus = 'ready';
+  window.dispatchEvent(new Event('forja:sync'));
 }
 
 function scheduleCloudPush() {
-  if (!cloudUserId) return;
+  if (!cloudUserId || !cloudReady) return;
   clearTimeout(pushTimer);
   pushTimer = setTimeout(pushToCloudNow, 800);
 }
@@ -246,8 +256,8 @@ export function save() {
 }
 
 export function resetApp() {
-  state = seedState();
-  persist(state);
+  state = normalizeFinance(seedState(), monthKey());
+  save();
 }
 
 export function exportData() {
@@ -261,8 +271,8 @@ export function importData(jsonString) {
   if (!parsed || typeof parsed !== 'object' || !parsed.finance || !parsed.goalsByYear) {
     throw new Error('Arquivo não parece ser um backup válido do Forja.');
   }
-  state = parsed;
-  persist(state);
+  state = normalizeFinance(parsed, monthKey());
+  save();
 }
 
 // ---------- rotina (tarefas recorrentes) ----------
@@ -582,24 +592,19 @@ export function logReading(dateISO, minutes) {
 
 // ---------- finance ----------
 export function cardInvoiceForMonth(cardId, ym = monthKey()) {
-  return state.finance.cardCharges
-    .filter((c) => c.cardId === cardId)
-    .reduce((sum, c) => {
-      const monthly = c.totalAmount / c.installments;
-      const idx = monthsBetween(c.startMonth, ym);
-      if (idx >= 0 && idx < c.installments) return sum + monthly;
-      return sum;
-    }, 0);
+  const invoice = state.finance.cardInvoices[`${cardId}:${ym}`];
+  if (invoice) return invoice.amount;
+  return projectedCardInvoice(cardId, ym);
 }
 
 export function chargeRemainingInstallments(charge, ym = monthKey()) {
   const idx = monthsBetween(charge.startMonth, ym);
-  return Math.max(charge.installments - idx, 0);
+  return Math.max(charge.installments - Math.max(idx, 0), 0);
 }
 
-export function addCardCharge({ cardId, desc, totalAmount, installments }) {
+export function addCardCharge({ cardId, desc, totalAmount, installments, startMonth = selectedFinanceMonth() }) {
   state.finance.cardCharges.push({
-    id: uid('charge'), cardId, desc, totalAmount, installments, startMonth: monthKey(),
+    id: uid('charge'), cardId, desc, totalAmount, installments, startMonth,
   });
   save();
 }
@@ -610,7 +615,7 @@ export function removeCardCharge(id) {
 }
 
 export function addCard({ name, limit, dueDay }) {
-  state.finance.cards.push({ id: uid('card'), name, limit, dueDay });
+  state.finance.cards.push({ id: uid('card'), name, limit, dueDay, startMonth: selectedFinanceMonth() });
   save();
 }
 
@@ -626,9 +631,9 @@ export function removeCard(id) {
   save();
 }
 
-export function addLoan({ name, bank, totalAmount, installments, monthlyAmount }) {
+export function addLoan({ name, bank, totalAmount, installments, monthlyAmount, startMonth = selectedFinanceMonth() }) {
   state.finance.loans.push({
-    id: uid('loan'), name, bank, totalAmount, installments, paidInstallments: 0,
+    id: uid('loan'), name, bank, totalAmount, installments, paidInstallments: 0, startMonth,
     monthlyAmount: monthlyAmount || Math.round((totalAmount / installments) * 100) / 100,
   });
   save();
@@ -646,36 +651,45 @@ export function removeLoan(id) {
 }
 
 export function addFixedBill({ name, amount, dueDay }) {
-  state.finance.fixedBills.push({ id: uid('bill'), name, amount, dueDay });
+  state.finance.fixedBills.push({ id: uid('bill'), name, amount, dueDay, startMonth: selectedFinanceMonth(), versions: [] });
   save();
 }
 
 export function updateFixedBill(id, patch) {
   const b = state.finance.fixedBills.find((x) => x.id === id);
-  if (b) Object.assign(b, patch);
+  if (b) {
+    const month = selectedFinanceMonth();
+    let v = b.versions.find(v => v.month === month);
+    if (!v) { v = { month }; b.versions.push(v); }
+    Object.assign(v, patch);
+  }
   save();
 }
 
 export function removeFixedBill(id) {
-  state.finance.fixedBills = state.finance.fixedBills.filter((b) => b.id !== id);
+  const bill = state.finance.fixedBills.find(b => b.id === id);
+  if (bill) bill.endMonth = selectedFinanceMonth();
   save();
 }
 
 export function updateLis(patch) {
-  Object.assign(state.finance.lis, patch);
+  const ym = selectedFinanceMonth();
+  state.finance.lisHistory[ym] = { ...lisAt(state.finance, ym), ...patch };
+  if (ym === monthKey()) Object.assign(state.finance.lis, patch);
   save();
 }
 
 export function updateBudget(amount) {
-  state.profile.budgetMensal = amount;
+  state.finance.budgets[selectedFinanceMonth()] = Math.max(0, amount);
+  if (selectedFinanceMonth() === monthKey()) state.profile.budgetMensal = amount;
   save();
 }
 
-export function addVariableExpense({ amount, category, method }) {
-  const ym = monthKey();
+export function addVariableExpense({ amount, category, method, date = todayISO(), desc = '' }) {
+  const ym = date.slice(0, 7);
   if (!state.finance.variableSpend[ym]) state.finance.variableSpend[ym] = [];
   state.finance.variableSpend[ym].push({
-    id: uid('spend'), date: todayISO(), amount, category, method,
+    id: uid('spend'), date, amount, category, method, desc,
   });
   save();
 }
@@ -710,16 +724,86 @@ export function togglePaid(ym, key) {
 
 export function monthCommitted(ym = monthKey()) {
   const f = state.finance;
-  const bills = f.fixedBills.reduce((s, b) => s + b.amount, 0);
-  const cards = f.cards.reduce((s, c) => s + cardInvoiceForMonth(c.id, ym), 0);
-  const loans = f.loans.filter((l) => activeLoanBalance(l) > 0).reduce((s, l) => s + l.monthlyAmount, 0);
-  const lis = f.lis.used;
-  const variable = variableSpendTotal(ym);
-  return { bills, cards, loans, lis, variable, total: bills + cards + loans + lis + variable };
+  const bills = sum(billsAt(f, ym).map(b => b.amount));
+  const cards = sum(f.cards.map(c => cardInvoiceForMonth(c.id, ym)));
+  const loans = sum(f.loans.map(l => loanAt(l, ym)));
+  const lis = lisAt(f, ym).used;
+  const entries = entriesAt(f, ym);
+  const variable = sum([variableSpendTotal(ym), ...entries.filter(e => e.type === 'expense').map(e => e.amount)]);
+  return { bills, cards, loans, lis, variable, total: sum([bills, cards, loans, lis, variable]) };
 }
 
 export function monthPercent(ym = monthKey()) {
   const committed = monthCommitted(ym).total;
-  const budget = state.profile.budgetMensal || 1;
-  return { committed, budget, pct: Math.round((committed / budget) * 1000) / 10 };
+  const budget = budgetAt(state, ym);
+  return { committed, budget, pct: budget > 0 ? Math.round((committed / budget) * 1000) / 10 : 0 };
+}
+
+let financeMonth = monthKey();
+export function selectedFinanceMonth() { return financeMonth; }
+export function selectFinanceMonth(ym) { if (/^\d{4}-(0[1-9]|1[0-2])$/.test(ym)) financeMonth = ym; }
+export function fixedBillsForMonth(ym = financeMonth) { return billsAt(state.finance, ym); }
+export function loanAmountForMonth(l, ym = financeMonth) { return loanAt(l, ym); }
+export function lisForMonth(ym = financeMonth) { return lisAt(state.finance, ym); }
+export function financeEntries(ym = financeMonth) { return entriesAt(state.finance, ym); }
+export function investmentPortfolio(ym = financeMonth, throughDate) { return portfolioAt(state.finance, ym, throughDate); }
+export function financialSummary(ym = financeMonth) {
+  const entries = financeEntries(ym);
+  const amount = (type, status) => sum(entries.filter(e => e.type === type && (!status || e.status === status)).map(e => e.amount));
+  const income = amount('income');
+  const received = amount('income', 'confirmed');
+  const invested = amount('investment');
+  const redeemed = amount('redemption');
+  const expenses = monthCommitted(ym).total;
+  return { income, received, invested, redeemed, expenses,
+    balance: sum([income, redeemed, -expenses, -invested]),
+    assets: sum(investmentPortfolio(ym).map(a => a.balance)) };
+}
+export function addFinanceEntry(entry) {
+  if (!Number.isFinite(Number(entry.amount)) || Number(entry.amount) < 0 ||
+      (Number(entry.amount) === 0 && entry.type !== 'valuation') ||
+      !/^\d{4}-(0[1-9]|1[0-2])-\d{2}$/.test(entry.date) ||
+      Number.isNaN(new Date(entry.date + 'T12:00:00').getTime())) throw new Error('Informe uma data e um valor válidos.');
+  state.finance.entries.push({ ...entry, amount: Math.round(Number(entry.amount) * 100) / 100,
+    id: uid('entry'), createdAt: new Date().toISOString() });
+  save();
+}
+export function updateFinanceOccurrence(id, ym, patch) {
+  const key = `${id}:${ym}`;
+  state.finance.entryOverrides[key] = { ...state.finance.entryOverrides[key], ...patch };
+  save();
+}
+export function endFinanceRecurrence(id, ym) {
+  const entry = state.finance.entries.find(e => e.id === id);
+  if (entry) entry.endMonth = ym;
+  save();
+}
+export function removeVariableExpense(id, ym) {
+  state.finance.variableSpend[ym] = (state.finance.variableSpend[ym] || []).filter(e => e.id !== id);
+  save();
+}
+
+export function projectedCardInvoice(cardId, ym = selectedFinanceMonth()) {
+  return sum(state.finance.cardCharges.filter(c => c.cardId === cardId).map(c => installmentAt(c, ym)));
+}
+export function registeredCardInvoice(cardId, ym = selectedFinanceMonth()) {
+  return state.finance.cardInvoices[`${cardId}:${ym}`];
+}
+export function setCardInvoice(cardId, ym, amount) {
+  if (!state.finance.cards.some(c => c.id === cardId) || !Number.isFinite(amount) || amount < 0) throw new Error('Informe um valor válido para a fatura.');
+  state.finance.cardInvoices[`${cardId}:${ym}`] = { amount: Math.round(amount * 100) / 100 };
+  save();
+}
+export function clearCardInvoice(cardId, ym) {
+  delete state.finance.cardInvoices[`${cardId}:${ym}`];
+  save();
+}
+export function monthlyAnalysis(ym = selectedFinanceMonth()) {
+  const summary = financialSummary(ym);
+  const ceiling = Math.round(summary.income * 80) / 100;
+  const previous = financialSummary(addMonths(ym, -1));
+  return { ...summary, ceiling, headroom: sum([ceiling, -summary.expenses]),
+    spendingRatio: summary.income > 0 ? Math.round(summary.expenses / summary.income * 1000) / 10 : null,
+    change: sum([summary.expenses, -previous.expenses]),
+    changePct: previous.expenses > 0 ? Math.round((summary.expenses / previous.expenses - 1) * 1000) / 10 : null };
 }

@@ -1,69 +1,58 @@
 import { sb } from '../supabase-client.js';
+import { icon } from '../icons.js';
+import { escapeHTML } from '../ui.js';
 
-let error = '';
-let info = '';
-let busy = false;
-let typedEmail = '';
-let typedPassword = '';
-
+let error = '', info = '', busy = false, typedEmail = '', typedPassword = '';
 export function render() {
-  return `
-    <div style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:12px;">
-      <div style="text-align:center;margin-bottom:8px;">
-        <div class="fjc" style="font-size:30px;font-weight:700;color:var(--ember);">FORJA</div>
-        <div class="muted" style="font-size:13px;margin-top:6px;">Entre com seu e-mail e senha</div>
-      </div>
-
-      <input type="email" id="login-email" placeholder="E-mail" autocomplete="username" value="${typedEmail}">
-      <input type="password" id="login-password" placeholder="Senha" autocomplete="current-password" value="${typedPassword}">
-
-      ${error ? `<div style="color:var(--red);font-size:13px;text-align:center;">${error}</div>` : ''}
-      ${info ? `<div style="color:var(--green);font-size:13px;text-align:center;">${info}</div>` : ''}
-
-      <button id="btn-login" class="btn btn-primary" ${busy ? 'disabled' : ''}>${busy ? 'Entrando…' : 'Entrar'}</button>
-      <button id="btn-signup" class="btn-ghost" ${busy ? 'disabled' : ''}>Criar conta com esse e-mail e senha</button>
+  return `<div class="login-layout">
+    <div class="login-story">
+      <div class="brand-mark">${icon.flame()}</div>
+      <div class="eyebrow">Construa o que importa</div>
+      <h1>FORJA<span style="color:var(--ember)">.</span></h1>
+      <p>Clareza na rotina.<br>Consistência nas escolhas.<br>Espaço para o seu próximo passo.</p>
     </div>
-  `;
+    <form class="login-form" id="login-form">
+      <div><h2>Seu espaço de evolução</h2><p class="page-description">Entre para continuar de onde parou.</p></div>
+      <label class="field">E-mail<input type="email" id="login-email" placeholder="voce@exemplo.com" autocomplete="username" required value="${escapeHTML(typedEmail)}"></label>
+      <label class="field">Senha<span class="password-wrap"><input type="password" id="login-password" placeholder="Sua senha" autocomplete="current-password" required minlength="6" value="${escapeHTML(typedPassword)}"><button type="button" id="show-password" aria-label="Mostrar senha">Mostrar</button></span></label>
+      <div role="alert" class="form-error">${escapeHTML(error)}</div>
+      ${info ? `<p class="hint" role="status">${escapeHTML(info)}</p>` : ''}
+      <button type="submit" class="btn btn-primary" ${busy ? 'disabled' : ''}>${busy ? 'Entrando…' : 'Entrar no Forja'}</button>
+      <button type="button" id="btn-signup" class="btn-ghost" ${busy ? 'disabled' : ''}>Criar minha conta</button>
+      <div class="brand-credit">By Alfa tauri innovation group</div>
+    </form>
+  </div>`;
 }
-
 export function afterRender(container, { render: rerender }) {
-  const emailInput = container.querySelector('#login-email');
-  const passInput = container.querySelector('#login-password');
-
-  function setState({ err = '', inf = '', busyState = false }) {
-    typedEmail = emailInput.value;
-    typedPassword = passInput.value;
-    error = err;
-    info = inf;
-    busy = busyState;
-    rerender();
+  const form = container.querySelector('#login-form');
+  const email = container.querySelector('#login-email');
+  const password = container.querySelector('#login-password');
+  email.addEventListener('input', () => typedEmail = email.value);
+  password.addEventListener('input', () => typedPassword = password.value);
+  container.querySelector('#show-password').addEventListener('click', ev => {
+    const show = password.type === 'password'; password.type = show ? 'text' : 'password';
+    ev.target.textContent = show ? 'Ocultar' : 'Mostrar'; ev.target.setAttribute('aria-label', show ? 'Ocultar senha' : 'Mostrar senha');
+  });
+  async function submit(signup) {
+    if (busy || !form.reportValidity()) return;
+    typedEmail = email.value.trim(); typedPassword = password.value;
+    busy = true; error = ''; info = ''; rerender();
+    try {
+      const result = await (signup ? sb.auth.signUp({ email: typedEmail, password: typedPassword }) : sb.auth.signInWithPassword({ email: typedEmail, password: typedPassword }));
+      if (result.error) throw result.error;
+      if (signup && !result.data.session) info = 'Conta criada. Confirme seu e-mail antes de entrar.';
+      else typedPassword = '';
+    } catch (err) { error = translate(err.message || ''); }
+    finally { busy = false; rerender(); }
   }
-
-  container.querySelector('#btn-login').addEventListener('click', async () => {
-    const email = emailInput.value.trim();
-    const password = passInput.value;
-    setState({ busyState: true });
-    const { error: err } = await sb.auth.signInWithPassword({ email, password });
-    if (err) setState({ err: traduzErro(err.message) });
-    // sucesso: onAuthStateChange no app.js cuida do redirecionamento
-  });
-
-  container.querySelector('#btn-signup').addEventListener('click', async () => {
-    const email = emailInput.value.trim();
-    const password = passInput.value;
-    setState({ busyState: true });
-    const { data, error: err } = await sb.auth.signUp({ email, password });
-    if (err) { setState({ err: traduzErro(err.message) }); return; }
-    if (!data.session) {
-      setState({ inf: 'Conta criada! Veja seu e-mail para confirmar antes de entrar.' });
-    }
-  });
+  form.addEventListener('submit', ev => { ev.preventDefault(); submit(false); });
+  container.querySelector('#btn-signup').addEventListener('click', () => submit(true));
 }
-
-function traduzErro(msg) {
-  if (/already registered/i.test(msg)) return 'Já existe uma conta com esse e-mail — tente entrar.';
+function translate(msg) {
+  if (/fetch|network|resolve/i.test(msg)) return 'Não foi possível conectar ao serviço de login. Verifique sua conexão ou tente novamente em instantes.';
+  if (/already registered/i.test(msg)) return 'Já existe uma conta com esse e-mail. Tente entrar.';
   if (/invalid login/i.test(msg)) return 'E-mail ou senha incorretos.';
-  if (/email not confirmed/i.test(msg)) return 'Confirme seu e-mail antes de entrar (veja sua caixa de entrada).';
-  if (/password/i.test(msg) && /6/.test(msg)) return 'A senha precisa ter pelo menos 6 caracteres.';
-  return msg;
+  if (/email not confirmed/i.test(msg)) return 'Confirme seu e-mail antes de entrar.';
+  if (/password/i.test(msg)) return 'Use uma senha com pelo menos 6 caracteres.';
+  return msg || 'Não foi possível entrar. Tente novamente.';
 }

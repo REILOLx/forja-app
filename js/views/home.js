@@ -1,7 +1,7 @@
 import { icon } from '../icons.js';
 import {
   todayISO, dayProgress, currentStreak, currentBlock, nextBlocks,
-  socialLockActive, formatDateLong, isBlockDone, todaysBlocks,
+  socialLockActive, formatDateLong, isBlockDone, todaysBlocks, financialSummary, formatMoney,
 } from '../store.js';
 
 function blockEndDate(block, now) {
@@ -28,6 +28,7 @@ export function render(state) {
   const block = currentBlock(now);
   const upcoming = nextBlocks(2, now);
   const locked = socialLockActive(now);
+  const finances = financialSummary();
 
   const treinoBlocks = todaysBlocks(now).filter((b) => b.type === 'treino');
   const treinoDone = treinoBlocks.length > 0 && treinoBlocks.every((b) => isBlockDone(iso, b.id));
@@ -43,16 +44,13 @@ export function render(state) {
       <div class="row gap-8">
         <div class="row gap-8" style="background:var(--ember-bg);border:1px solid var(--ember-border);border-radius:20px;padding:6px 12px;">
           <span style="width:15px;height:15px;color:var(--ember);display:flex;">${icon.flame()}</span>
-          <span class="fjc" style="font-size:14px;font-weight:700;color:oklch(0.85 0.1 55);">${streak}</span>
+          <span class="fjc" style="font-size:14px;font-weight:700;color:var(--ember);">${streak}</span>
         </div>
         <a href="#/config" style="width:18px;height:18px;color:var(--text-dim-2);display:flex;">${icon.gear()}</a>
       </div>
     </div>
 
-    <div>
-      <div class="fjc" style="font-size:24px;font-weight:700;">Protocolo de hoje</div>
-      <div class="muted" style="font-size:14px;margin-top:4px;">Cumpra os blocos para liberar as redes à noite.</div>
-    </div>
+    <section class="welcome-hero"><div class="eyebrow">Um dia de cada vez</div><h1>Seu próximo passo<br>começa aqui.</h1><p class="page-description">${done === total && total > 0 ? 'Você concluiu os blocos de hoje. Reconheça seu progresso.' : 'Organize o dia e avance no que importa para você.'}</p></section>
 
     <a href="#/rotina" class="card" style="display:block;">
       <div class="row" style="margin-bottom:12px;align-items:baseline;">
@@ -76,7 +74,7 @@ export function render(state) {
       <a href="#/bloqueio" class="card card-tight stack gap-8" style="text-decoration:none;color:inherit;border-color:${locked ? 'var(--red-border)' : 'var(--border)'};background:${locked ? 'var(--red-bg)' : 'var(--surface)'};">
         <span style="width:18px;height:18px;color:${locked ? 'var(--red)' : 'var(--green)'};display:flex;">${icon.lock()}</span>
         <span style="font-size:11.5px;color:var(--text-dim);">Redes</span>
-        <span style="font-size:12.5px;font-weight:700;color:${locked ? 'var(--red)' : 'var(--green)'};">${locked ? 'Bloqueadas' : 'Liberadas'}</span>
+        <span style="font-size:12.5px;font-weight:700;color:${locked ? 'var(--red)' : 'var(--green)'};">${locked ? 'Foco ativo' : 'Janela livre'}</span>
       </a>
     </div>
 
@@ -87,7 +85,7 @@ export function render(state) {
           <span class="section-label" style="margin:0;color:oklch(0.7 0.1 200);">Agora</span>
         </div>
         <div class="fjc" style="font-size:17px;font-weight:700;margin-bottom:4px;">${block.start} – ${block.end} · ${block.title}</div>
-        <div class="muted" style="font-size:13px;margin-bottom:14px;">${block.type === 'foco' ? 'Bloqueio de redes sociais ativo neste período.' : ''}</div>
+        <div class="muted" style="font-size:13px;margin-bottom:14px;">${block.type === 'foco' ? 'Período reservado para foco. Acompanhe sua rotina no Forja.' : ''}</div>
         <div class="row">
           <span class="muted" style="font-size:13px;">Restam</span>
           <span class="fjc" style="font-size:20px;font-weight:700;color:var(--cyan);">${remainingLabel(block, now)}</span>
@@ -100,16 +98,17 @@ export function render(state) {
         <div class="section-label">Próximos blocos</div>
         <div class="stack" style="border-radius:10px;overflow:hidden;border:1px solid var(--border);">
           ${upcoming.map((b) => `
-            <div class="row" style="background:var(--surface);padding:13px 16px;border-bottom:1px solid var(--border);">
+            <a href="#/rotina" class="row" style="color:inherit;background:var(--surface);padding:13px 16px;border-bottom:1px solid var(--border);">
               <div class="stack">
                 <span style="font-size:14px;font-weight:600;${b.type === 'livre' ? 'color:var(--red);' : ''}">${b.title}</span>
                 <span class="muted" style="font-size:12px;">${b.start} – ${b.end}</span>
               </div>
               <span style="width:16px;height:16px;color:var(--text-dim-2);display:flex;">${icon.chevronRight()}</span>
-            </div>
+            </a>
           `).join('')}
         </div>
       </div>
     ` : ''}
+    <a href="#/financeiro" class="card row" style="color:inherit;gap:16px"><div><div class="section-label">Seu mês em perspectiva</div><div class="fjc" style="font-size:24px;color:${finances.balance < 0 ? 'var(--red)' : 'var(--ember)'}">${formatMoney(finances.balance)}</div><p class="hint">Saldo previsto · revise suas entradas e compromissos</p></div>${icon.chevronRight()}</a>
   `;
 }

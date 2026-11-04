@@ -1,203 +1,101 @@
 import { icon } from '../icons.js';
-import {
-  monthPercent, cardInvoiceForMonth, activeLoanBalance, formatMoney,
-} from '../store.js';
+import * as store from '../store.js';
+import * as settings from './financeiro-settings.js';
+import { renderAnalysis } from './finance-analysis.js';
+import { escapeHTML as esc, monthLabel, monthPicker, bindMonthPicker, toast } from '../ui.js';
 
-let editingBudget = false;
-let editingLis = false;
-let editingBillId = null;
-let showAddBill = false;
-
+let tab = 'overview';
+let filter = 'all';
+let editingEntry = null;
+const TYPES = { income:'Receita',expense:'Despesa',investment:'Aporte',redemption:'Resgate',yield:'Rendimento',valuation:'Saldo atualizado' };
 export function render(state) {
-  const { committed, budget, pct } = monthPercent();
-  const excess = Math.max(committed - budget, 0);
-  const over = pct > 100;
-  const scaleMax = Math.max(pct, 100);
-  const fillWidth = (pct / scaleMax) * 100;
-  const markerPos = (100 / scaleMax) * 100;
-  const lis = state.finance.lis;
-  const lisPct = lis.limit ? Math.round((lis.used / lis.limit) * 1000) / 10 : 0;
-
-  return `
-    <div class="row">
-      <div class="fjc" style="font-size:22px;font-weight:700;">Financeiro</div>
-      <div class="muted" style="font-size:12.5px;">${new Intl.DateTimeFormat('pt-BR', { month: 'long' }).format(new Date())}</div>
+  const ym = store.selectedFinanceMonth();
+  const summary = store.financialSummary(ym);
+  const analysis = store.monthlyAnalysis(ym);
+  const parts = store.monthCommitted(ym);
+  return `<div class="page-heading"><div><div class="eyebrow">Planeje. Acompanhe. Evolua.</div><h1>Financeiro</h1><p class="page-description">Uma visão clara do seu presente e do que vem pela frente.</p></div><a href="#/config" class="icon-button" aria-label="Ajustes e backup">${icon.gear()}</a></div>
+    ${monthPicker()}
+    <section class="hero-balance" aria-label="Resumo do mês">
+      <div class="row"><span class="section-label" style="margin:0;color:var(--ember)">Saldo previsto do mês</span><span class="pill pill-dim">${ym > store.monthKey() ? 'Planejamento' : ym < store.monthKey() ? 'Histórico' : 'Mês atual'}</span></div>
+      <div class="hero-amount ${summary.balance < 0 ? 'negative' : ''}">${store.formatMoney(summary.balance)}</div>
+      <p class="hint">Receitas + resgates − despesas − aportes. É uma previsão mensal, não o saldo da sua conta.</p>
+      <div class="hero-foot"><span>${store.formatMoney(summary.received)} em receitas confirmadas</span><span>·</span><span>${store.formatMoney(summary.income - summary.received)} a receber</span></div>
+    </section>
+    <div class="metric-grid">
+      ${metric('Receitas previstas', summary.income, 'positive')}${metric('Despesas previstas', summary.expenses)}${metric('Aportes do mês', summary.invested)}${metric('Patrimônio registrado', summary.assets, 'positive')}
     </div>
-
-    <div class="card" style="background:${over ? 'var(--red-bg)' : 'var(--green-bg)'};border-color:${over ? 'var(--red-border)' : 'oklch(0.4 0.1 145)'};">
-      <div class="row" style="margin-bottom:10px;align-items:baseline;">
-        <span class="section-label" style="margin:0;color:${over ? 'oklch(0.8 0.13 25)' : 'oklch(0.8 0.13 145)'};">Comprometido do mês</span>
-        <span class="fjc" style="font-size:30px;font-weight:700;color:${over ? 'var(--red)' : 'var(--green)'};">${pct}%</span>
-      </div>
-      <div style="position:relative;height:10px;border-radius:6px;background:oklch(0.3 0.02 260);margin-bottom:10px;">
-        <div style="position:absolute;left:0;top:0;height:100%;width:${fillWidth}%;background:${over ? 'var(--red)' : 'var(--green)'};border-radius:6px;"></div>
-        ${over ? `<div style="position:absolute;left:${markerPos}%;top:-3px;width:2px;height:16px;background:var(--text);"></div>` : ''}
-      </div>
-      <div class="row" style="font-size:12px;color:${over ? 'oklch(0.75 0.05 25)' : 'oklch(0.75 0.05 145)'};">
-        <span>${formatMoney(committed)} comprometidos</span>
-        ${editingBudget ? `
-          <input type="number" id="budget-input" value="${budget}" style="width:110px;padding:4px 8px;font-size:12px;">
-        ` : `<button id="btn-edit-budget" style="background:none;border:none;color:inherit;text-decoration:underline;font-size:12px;">de ${formatMoney(budget)} disponíveis (editar)</button>`}
-      </div>
-      ${excess > 0 ? `
-        <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--red-border);font-size:12.5px;color:oklch(0.85 0.1 25);">
-          ${formatMoney(excess)} excedentes rolando para os próximos meses.
-        </div>` : ''}
+    <div class="quick-actions">
+      <a href="#/financeiro/receita" class="card quick-action">${icon.plus()}<span>Nova receita</span></a>
+      <a href="#/financeiro/lancar" class="card quick-action">${icon.wallet()}<span>Nova despesa</span></a>
+      <a href="#/financeiro/cartoes" class="card quick-action">${icon.card()}<span>Lançar fatura</span></a>
+      <a href="#/financeiro/investimentos" class="card quick-action">${icon.target()}<span>Investimentos</span></a>
     </div>
-
-    <div class="grid-2">
-      <a href="#/financeiro/lancar" class="card" style="text-decoration:none;color:inherit;">
-        <span style="width:18px;height:18px;color:var(--ember);display:flex;margin-bottom:8px;">${icon.plus()}</span>
-        <div style="font-size:13px;font-weight:700;">Lançar gasto</div>
-      </a>
-      <a href="#/financeiro/pagamentos" class="card" style="text-decoration:none;color:inherit;">
-        <span style="width:18px;height:18px;color:var(--cyan);display:flex;margin-bottom:8px;">${icon.card()}</span>
-        <div style="font-size:13px;font-weight:700;">Pagamentos do mês</div>
-      </a>
+    <div class="segmented" role="tablist" aria-label="Visões do financeiro">
+      ${[['overview','Visão geral'],['ledger','Lançamentos'],['commitments','Compromissos']].map(([id,label])=>`<button role="tab" aria-selected="${tab===id}" class="${tab===id?'active':''}" data-finance-tab="${id}">${label}</button>`).join('')}
     </div>
-
-    <div>
-      <div class="row" style="margin-bottom:10px;">
-        <span class="section-label" style="margin:0;">Contas fixas</span>
-        <button id="btn-toggle-add-bill" style="background:none;border:none;color:var(--text-dim-2);display:flex;">${icon.plus()}</button>
-      </div>
-      <div class="stack gap-8">
-        ${state.finance.fixedBills.map((b) => {
-          const isEditing = editingBillId === b.id;
-          return isEditing ? `
-            <div class="card card-tight stack gap-8">
-              <input type="text" data-bill-field="name" data-bill-id="${b.id}" value="${b.name}" placeholder="Nome">
-              <div class="row gap-8">
-                <input type="number" data-bill-field="amount" data-bill-id="${b.id}" value="${b.amount}" placeholder="Valor" style="flex:1;">
-                <input type="number" data-bill-field="dueDay" data-bill-id="${b.id}" value="${b.dueDay}" placeholder="Dia venc." style="flex:1;">
-              </div>
-              <button data-action="removeFixedBill" data-id="${b.id}" class="btn" style="background:var(--red-bg);color:var(--red);border:1px solid var(--red-border);">Remover conta</button>
-            </div>
-          ` : `
-            <button data-toggle-edit-bill="${b.id}" class="row card card-tight" style="width:100%;background:var(--surface);border:1px solid var(--border);color:inherit;">
-              <span style="font-size:13.5px;">${b.name} <span class="muted">· dia ${b.dueDay}</span></span>
-              <span class="fjc" style="font-size:13.5px;font-weight:700;">${formatMoney(b.amount)}</span>
-            </button>`;
-        }).join('')}
-      </div>
-      ${showAddBill ? `
-        <div class="card stack gap-8" style="margin-top:8px;">
-          <input type="text" data-field="name" placeholder="Nome (ex: Aluguel)">
-          <div class="row gap-8">
-            <input type="number" data-field="amount" placeholder="Valor" style="flex:1;">
-            <input type="number" data-field="dueDay" placeholder="Dia do vencimento" style="flex:1;">
-          </div>
-          <button data-action="salvarContaFixa" class="btn btn-primary">Salvar conta</button>
+    <div role="tabpanel" class="stack" style="gap:22px">
+    ${tab === 'commitments' ? settings.render(state) : tab === 'ledger' ? ledger(state, ym) : `
+      ${renderAnalysis(ym)}
+      <div class="finance-columns">
+        <section class="card finance-section"><div class="row"><h2>Destino do seu dinheiro</h2><a href="#/financeiro/pagamentos" class="hint" style="color:var(--ember)">Ver pagamentos →</a></div>
+          ${[['Contas fixas',parts.bills],['Faturas de cartão',parts.cards],['Empréstimos',parts.loans],['Despesas avulsas',parts.variable],['Limite especial provisionado',parts.lis]].map(([label,value])=>`<div class="finance-row"><span><strong>${label}</strong></span><span class="amount">${store.formatMoney(value)}</span></div>`).join('')}
+        </section>
+        <div class="finance-section">
+          <section class="card finance-section"><h2>Seu teto de gastos · 80%</h2>
+            <div class="row"><strong class="fjc">${store.formatMoney(summary.expenses)}</strong><span class="hint">de ${store.formatMoney(analysis.ceiling)}</span></div>
+            <div class="progress-track"><div class="progress-fill" style="width:${analysis.ceiling > 0 ? Math.min(100,summary.expenses/analysis.ceiling*100) : summary.expenses>0?100:0}%;background:${analysis.headroom < 0 ? 'var(--red)' : 'var(--ember)'}"></div></div>
+            <p class="hint">${summary.income===0?'Registre suas receitas para calcular o teto mensal.':analysis.headroom<0?`${store.formatMoney(-analysis.headroom)} acima do teto de gastos.`:`${store.formatMoney(analysis.headroom)} de margem até o teto.`}</p>
+            <p class="hint">20% das receitas (${store.formatMoney(summary.income*.2)}) ficam fora do teto para sua reserva e seus investimentos.</p>
+          </section>
+          <section class="card finance-section"><h2>Receitas do mês</h2>${incomePreview(ym)}</section>
         </div>
-      ` : ''}
-    </div>
-
-    <div>
-      <a href="#/financeiro/cartoes" class="row" style="text-decoration:none;color:inherit;margin-bottom:10px;">
-        <span class="section-label" style="margin:0;">Cartões de crédito</span>
-        <span style="width:15px;height:15px;color:var(--text-dim-2);display:flex;">${icon.chevronRight()}</span>
-      </a>
-      <div class="stack gap-8">
-        ${state.finance.cards.map((c) => {
-          const invoice = cardInvoiceForMonth(c.id);
-          const usedPct = Math.round((invoice / c.limit) * 100);
-          return `
-            <div class="card card-tight">
-              <div class="row" style="margin-bottom:4px;">
-                <span style="font-size:13.5px;font-weight:600;">${c.name}</span>
-                <span class="fjc" style="font-size:14px;font-weight:700;">${formatMoney(invoice)}</span>
-              </div>
-              <div class="row" style="font-size:11.5px;color:var(--text-dim);">
-                <span>vence dia ${c.dueDay}</span>
-                <span>${usedPct}% do limite usado</span>
-              </div>
-            </div>`;
-        }).join('') || '<div class="muted" style="font-size:13px;">Nenhum cartão cadastrado.</div>'}
       </div>
-    </div>
-
-    <div>
-      <a href="#/financeiro/emprestimos" class="row" style="text-decoration:none;color:inherit;margin-bottom:10px;">
-        <span class="section-label" style="margin:0;">Empréstimos</span>
-        <span style="width:15px;height:15px;color:var(--text-dim-2);display:flex;">${icon.chevronRight()}</span>
-      </a>
-      <div class="stack gap-8">
-        ${state.finance.loans.filter((l) => activeLoanBalance(l) > 0).map((l) => {
-          const pctLoan = Math.round((l.paidInstallments / l.installments) * 100);
-          return `
-            <div class="card">
-              <div class="row" style="margin-bottom:8px;align-items:baseline;">
-                <span style="font-size:13.5px;font-weight:600;">${l.name} · ${l.bank}</span>
-                <span class="fjc" style="font-size:13px;font-weight:700;color:var(--ember);">${pctLoan}%</span>
-              </div>
-              <div class="progress-track thin" style="margin-bottom:6px;"><div class="progress-fill" style="width:${pctLoan}%;"></div></div>
-              <div class="muted" style="font-size:11.5px;">Faltam ${activeLoanBalance(l)} de ${l.installments} parcelas · ${formatMoney(l.monthlyAmount)}/mês</div>
-            </div>`;
-        }).join('') || '<div class="muted" style="font-size:13px;">Nenhum empréstimo em aberto.</div>'}
-      </div>
-    </div>
-
-    <div>
-      <div class="row" style="margin-bottom:10px;">
-        <span class="section-label" style="margin:0;">LIS · Limite especial</span>
-        <button id="btn-toggle-lis" style="background:none;border:none;color:var(--text-dim-2);display:flex;">${icon.gear()}</button>
-      </div>
-      <div class="card" style="border-color:var(--red-border);">
-        ${editingLis ? `
-          <div class="row gap-8">
-            <input type="number" id="lis-used" value="${lis.used}" placeholder="Usado" style="flex:1;">
-            <input type="number" id="lis-limit" value="${lis.limit}" placeholder="Limite" style="flex:1;">
-          </div>
-        ` : `
-          <div class="row" style="margin-bottom:8px;align-items:baseline;">
-            <span style="font-size:13.5px;font-weight:600;">Crédito especial em uso</span>
-            <span class="fjc" style="font-size:13px;font-weight:700;color:var(--red);">${formatMoney(lis.used)} / ${formatMoney(lis.limit)}</span>
-          </div>
-          <div class="progress-track thin"><div class="progress-fill" style="width:${lisPct}%;background:var(--red);"></div></div>
-        `}
-      </div>
-    </div>
-  `;
+      <section class="finance-section"><div><h2>No seu horizonte</h2><p class="page-description">Próximos 3 meses · com os compromissos já cadastrados.</p></div>
+      <div class="forecast-grid">${[1,2,3].map(n=>{const m=store.addMonths(ym,n),s=store.financialSummary(m);return `<button class="card forecast" data-forecast-month="${m}"><small>${monthLabel(m,true)}</small><strong class="${s.balance<0?'negative':'positive'}">${store.formatMoney(s.balance)}</strong><p>Entradas ${store.formatMoney(s.income+s.redeemed)}<br>Saídas ${store.formatMoney(s.expenses+s.invested)}</p></button>`;}).join('')}</div>
+      <p class="hint">Projeção baseada em recorrências, parcelas e lançamentos previstos. Não estima juros, rentabilidade ou despesas ainda não registradas. O limite especial é provisionado integralmente até ser atualizado.</p></section>
+    `}</div>`;
 }
-
-export function afterRender(container, { render }) {
-  const store = window.__forja.store;
-
-  const editBudgetBtn = container.querySelector('#btn-edit-budget');
-  if (editBudgetBtn) editBudgetBtn.addEventListener('click', () => { editingBudget = true; render(); });
-  const budgetInput = container.querySelector('#budget-input');
-  if (budgetInput) budgetInput.addEventListener('change', () => {
-    store.updateBudget(parseFloat(budgetInput.value || '0'));
-    editingBudget = false;
-    render();
-  });
-
-  const lisBtn = container.querySelector('#btn-toggle-lis');
-  if (lisBtn) lisBtn.addEventListener('click', () => { editingLis = !editingLis; render(); });
-  const lisUsed = container.querySelector('#lis-used');
-  const lisLimit = container.querySelector('#lis-limit');
-  if (lisUsed) lisUsed.addEventListener('change', () => store.updateLis({ used: parseFloat(lisUsed.value || '0') }));
-  if (lisLimit) lisLimit.addEventListener('change', () => store.updateLis({ limit: parseFloat(lisLimit.value || '0') }));
-
-  container.querySelectorAll('[data-toggle-edit-bill]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      editingBillId = editingBillId === btn.dataset.toggleEditBill ? null : btn.dataset.toggleEditBill;
-      render();
-    });
-  });
-  container.querySelectorAll('[data-bill-field]').forEach((input) => {
-    input.addEventListener('change', () => {
-      const val = input.type === 'number' ? parseFloat(input.value || '0') : input.value;
-      store.updateFixedBill(input.dataset.billId, { [input.dataset.billField]: val });
-    });
-  });
-  const addBillBtn = container.querySelector('#btn-toggle-add-bill');
-  if (addBillBtn) addBillBtn.addEventListener('click', () => { showAddBill = !showAddBill; render(); });
+function metric(label, value, cls='') { return `<div class="metric"><span>${label}</span><strong class="${cls}">${store.formatMoney(value)}</strong></div>`; }
+function incomePreview(ym) {
+  const entries=store.financeEntries(ym).filter(e=>e.type==='income');
+  return entries.length ? entries.map(e=>`<div class="finance-row"><span><strong>${esc(e.description)}</strong><small>${e.recurring?'Mensal · ':''}${e.status==='confirmed'?'Recebido':'A receber'} · dia ${e.date.slice(8)}</small></span><span class="amount positive">${store.formatMoney(e.amount)}</span></div>`).join('') : `<div class="empty-state"><strong>Nenhuma receita registrada</strong><p>Inclua seu salário e as entradas previstas para enxergar o saldo do mês.</p><a href="#/financeiro/receita" class="btn-link" style="display:inline-block;color:var(--ember)">Adicionar receita →</a></div>`;
 }
-
-export function closeForms() {
-  showAddBill = false;
-  editingBillId = null;
-  editingBudget = false;
-  editingLis = false;
+function ledger(state,ym) {
+  const entries=store.financeEntries(ym).map(e=>({...e,source:'entry'}));
+  (state.finance.variableSpend[ym]||[]).forEach(e=>entries.push({...e,description:e.desc||e.category,type:'expense',status:'confirmed',source:'legacy'}));
+  const visible=entries.filter(e=>filter==='all'||e.type===filter).sort((a,b)=>b.date.localeCompare(a.date));
+  return `<div class="row gap-10"><h2>Lançamentos do mês</h2><label class="field"><select id="ledger-filter" aria-label="Filtrar lançamentos">${[['all','Todos'],...Object.entries(TYPES)].map(([v,label])=>`<option value="${v}" ${filter===v?'selected':''}>${label}</option>`).join('')}</select></label></div>
+    <p class="hint">Movimentos avulsos e recorrentes. Contas fixas, faturas e parcelas estão em <a href="#/financeiro/pagamentos">Pagamentos do mês</a>.</p>
+    ${visible.length ? `<div class="card">${visible.map(e=>`<div class="finance-row" style="align-items:flex-start"><div style="flex:1"><strong>${esc(e.description)}</strong><small>${TYPES[e.type]} · ${e.date.slice(8)}/${e.date.slice(5,7)}${e.recurring?' · mensal':''}${e.asset?` · ${esc(e.asset)}`:''}</small>
+      <span class="pill ${e.status==='confirmed'?'pill-green':'pill-dim'}" style="display:inline-block;margin-top:8px">${e.status==='confirmed'?'Confirmado':'Previsto'}</span>
+      <div class="row gap-8" style="justify-content:flex-start;flex-wrap:wrap;margin-top:6px">
+        ${e.source==='entry'?`<button class="btn-link" data-entry-toggle="${e.id}">${e.status==='confirmed'?'Marcar previsto':'Confirmar'}</button><button class="btn-link" data-entry-edit="${e.id}">Editar</button>`:''}
+        <button class="btn-link" data-entry-delete="${e.id}" data-source="${e.source}">Excluir este mês</button>
+        ${e.recurring?`<button class="btn-link" data-entry-end="${e.id}">Encerrar repetição</button>`:''}
+      </div>
+      ${editingEntry===e.id?`<form data-edit-entry-form="${e.id}" class="stack gap-8" style="margin-top:12px"><label class="field">Descrição<input name="description" value="${esc(e.description)}" required maxlength="120"></label><label class="field">Valor (R$)<input name="amount" type="number" min="${e.type==='valuation'?'0':'0.01'}" step="0.01" value="${e.amount}" required></label><p class="hint">Altera somente a ocorrência deste mês.</p><button class="btn btn-primary">Salvar alteração</button></form>`:''}
+    </div><span class="amount ${['income','redemption','yield'].includes(e.type)?'positive':''}">${store.formatMoney(e.amount)}</span></div>`).join('')}</div>` : '<div class="empty-state"><strong>Um mês para organizar</strong><p>Nenhum lançamento neste filtro. Use os atalhos acima para começar.</p></div>'}`;
 }
+export function afterRender(container, {render}) {
+  bindMonthPicker(container,render);
+  container.querySelectorAll('[data-finance-tab]').forEach(el=>el.addEventListener('click',()=>{tab=el.dataset.financeTab;editingEntry=null;render();}));
+  container.querySelectorAll('[data-forecast-month]').forEach(el=>el.addEventListener('click',()=>{store.selectFinanceMonth(el.dataset.forecastMonth);render();}));
+  if(tab==='commitments') settings.afterRender(container,{render});
+  container.querySelector('#ledger-filter')?.addEventListener('change',ev=>{filter=ev.target.value;render();});
+  const ym=store.selectedFinanceMonth();
+  container.querySelectorAll('[data-entry-toggle]').forEach(el=>el.addEventListener('click',()=>{
+    const e=store.financeEntries(ym).find(e=>e.id===el.dataset.entryToggle);
+    if(e.status!=='confirmed' && ym>store.monthKey()) {toast('Mantenha os movimentos futuros como previstos.');return;}
+    store.updateFinanceOccurrence(e.id,ym,{status:e.status==='confirmed'?'planned':'confirmed'});render();toast('Situação atualizada.');
+  }));
+  container.querySelectorAll('[data-entry-edit]').forEach(el=>el.addEventListener('click',()=>{editingEntry=editingEntry===el.dataset.entryEdit?null:el.dataset.entryEdit;render();}));
+  container.querySelectorAll('[data-edit-entry-form]').forEach(form=>form.addEventListener('submit',ev=>{ev.preventDefault();store.updateFinanceOccurrence(form.dataset.editEntryForm,ym,{description:form.elements.description.value.trim(),amount:Number(form.elements.amount.value)});editingEntry=null;render();toast('Lançamento atualizado.');}));
+  container.querySelectorAll('[data-entry-delete]').forEach(el=>el.addEventListener('click',()=>{
+    if(!window.confirm('Excluir este lançamento do mês selecionado?'))return;
+    if(el.dataset.source==='legacy')store.removeVariableExpense(el.dataset.entryDelete,ym);else store.updateFinanceOccurrence(el.dataset.entryDelete,ym,{deleted:true});render();toast('Lançamento excluído.');
+  }));
+  container.querySelectorAll('[data-entry-end]').forEach(el=>el.addEventListener('click',()=>{
+    if(window.confirm('Encerrar a repetição a partir deste mês? Os meses anteriores serão mantidos.')){store.endFinanceRecurrence(el.dataset.entryEnd,ym);render();}
+  }));
+}
+export function closeForms() { settings.closeForms(); }

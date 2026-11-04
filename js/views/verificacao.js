@@ -47,7 +47,7 @@ export function render(state) {
       <div class="row gap-8">
         ${['leve', 'medio', 'pesado'].map((f) => `
           <button data-action="setFeeling" data-feeling="${f}" data-date="${iso}"
-            style="flex:1;text-align:center;padding:11px 0;border-radius:9px;border:1.5px solid ${log.feeling === f ? 'var(--ember)' : 'var(--border)'};background:${log.feeling === f ? 'var(--ember-bg)' : 'var(--surface)'};color:${log.feeling === f ? 'oklch(0.85 0.1 55)' : 'var(--text)'};font-size:12.5px;font-weight:${log.feeling === f ? '700' : '400'};">
+            style="flex:1;text-align:center;padding:11px 0;border-radius:9px;border:1.5px solid ${log.feeling === f ? 'var(--ember)' : 'var(--border)'};background:${log.feeling === f ? 'var(--ember-bg)' : 'var(--surface)'};color:${log.feeling === f ? 'var(--ember)' : 'var(--text)'};font-size:12.5px;font-weight:${log.feeling === f ? '700' : '400'};">
             ${f === 'leve' ? 'Leve' : f === 'medio' ? 'Na medida' : 'Pesado'}
           </button>
         `).join('')}
@@ -69,7 +69,7 @@ export function afterRender(container) {
   const ta = container.querySelector('#workout-note');
   if (ta) {
     ta.addEventListener('change', () => {
-      window.__forja.store.setWorkoutNote(new Date().toISOString().slice(0, 10), ta.value);
+      window.__forja.store.setWorkoutNote(todayISO(), ta.value);
     });
   }
 }

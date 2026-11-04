@@ -1,5 +1,7 @@
 import { icon } from '../icons.js';
-import { cardInvoiceForMonth, chargeRemainingInstallments, formatMoney } from '../store.js';
+import { cardInvoiceForMonth, chargeRemainingInstallments, formatMoney, selectedFinanceMonth, monthsBetween, registeredCardInvoice, projectedCardInvoice } from '../store.js';
+
+import { monthPicker, bindMonthPicker, monthLabel } from '../ui.js';
 
 let editingCardId = null;
 let showAddCard = false;
@@ -7,6 +9,7 @@ let showAddCharge = false;
 
 export function render(state) {
   const f = state.finance;
+  const ym = selectedFinanceMonth();
 
   return `
     <div class="row" style="gap:12px;justify-content:flex-start;">
@@ -14,12 +17,15 @@ export function render(state) {
       <div class="fjc" style="font-size:18px;font-weight:700;">Cartões de crédito</div>
     </div>
 
+    ${monthPicker()}
     ${f.cards.map((c) => {
-      const invoice = cardInvoiceForMonth(c.id);
+      const invoice = cardInvoiceForMonth(c.id, ym);
+      const manual = registeredCardInvoice(c.id, ym);
+      const estimated = projectedCardInvoice(c.id, ym);
       const usedPct = Math.min(Math.round((invoice / c.limit) * 100), 100);
       const charges = f.cardCharges
-        .map((ch) => ({ ...ch, remaining: chargeRemainingInstallments(ch) }))
-        .filter((ch) => ch.cardId === c.id && ch.remaining > 0);
+        .map((ch) => ({ ...ch, remaining: chargeRemainingInstallments(ch, ym) }))
+        .filter((ch) => ch.cardId === c.id && ch.remaining > 0 && ch.startMonth <= ym);
       const isEditing = editingCardId === c.id;
       return `
         <div class="card" style="padding:20px;">
@@ -41,7 +47,7 @@ export function render(state) {
             </div>
           ` : `
             <div class="fjc" style="font-size:26px;font-weight:700;margin-bottom:4px;">${formatMoney(invoice)}</div>
-            <div class="muted" style="font-size:12px;margin-bottom:16px;">fatura atual · vence dia ${c.dueDay}</div>
+            <div class="muted" style="font-size:12px;margin-bottom:16px;">${manual ? 'Fatura informada' : 'Previsão por parcelas'} · ${monthLabel(ym, true)} · dia ${c.dueDay}</div>
             <div class="progress-track thin" style="margin-bottom:6px;"><div class="progress-fill" style="width:${usedPct}%;"></div></div>
             <div class="row" style="font-size:11.5px;color:var(--text-dim);">
               <span>${usedPct}% do limite usado</span>
@@ -49,6 +55,12 @@ export function render(state) {
             </div>
           `}
 
+          <form class="invoice-form" data-invoice-form="${c.id}">
+            <label class="field">Fatura total de ${monthLabel(ym)} (R$)<input type="number" name="amount" min="0" step="0.01" inputmode="decimal" placeholder="${estimated.toFixed(2)}" value="${manual ? manual.amount : ''}" required></label>
+            <p class="hint">Informe o total da fatura, incluindo compras à vista, parcelas, taxas e ajustes. Esse total substitui a previsão de ${formatMoney(estimated)} neste mês.</p>
+            <button class="btn btn-primary" type="submit">Salvar fatura do mês</button>
+            ${manual ? `<button class="btn-link" type="button" data-clear-invoice="${c.id}">Usar previsão das parcelas novamente</button>` : ''}
+          </form>
           ${charges.length ? `
             <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);">
               <div class="section-label">Compras parceladas em aberto</div>
@@ -91,9 +103,10 @@ export function render(state) {
 
     ${showAddCharge ? `
       <div class="card stack gap-8" id="add-charge-box">
-        <div class="section-label" style="margin:0;">Nova compra parcelada</div>
+        <div class="section-label" style="margin:0;">Nova compra parcelada</div><p class="hint">A primeira parcela entra no mês selecionado acima.</p>
         <select data-field="cardId">
-          ${f.cards.map((c) => `<option value="${c.id}">${c.name}</option>`).join('')}
+          ${monthPicker()}
+    ${f.cards.map((c) => `<option value="${c.id}">${c.name}</option>`).join('')}
         </select>
         <input type="text" data-field="desc" placeholder="Descrição (ex: tênis)">
         <input type="number" data-field="amount" step="0.01" min="0" placeholder="Valor total (R$)">
@@ -105,6 +118,14 @@ export function render(state) {
 }
 
 export function afterRender(container, { render }) {
+  bindMonthPicker(container, render);
+  container.querySelectorAll('[data-invoice-form]').forEach(form => form.addEventListener('submit', ev => {
+    ev.preventDefault();
+    window.__forja.store.setCardInvoice(form.dataset.invoiceForm, selectedFinanceMonth(), Number(form.elements.amount.value)); render();
+  }));
+  container.querySelectorAll('[data-clear-invoice]').forEach(button => button.addEventListener('click', () => {
+    window.__forja.store.clearCardInvoice(button.dataset.clearInvoice, selectedFinanceMonth()); render();
+  }));
   const store = window.__forja.store;
 
   container.querySelectorAll('[data-toggle-edit-card]').forEach((btn) => {

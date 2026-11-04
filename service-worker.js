@@ -1,4 +1,4 @@
-const CACHE_NAME = 'forja-cache-v4';
+const CACHE_NAME = 'forja-cache-v7';
 const ASSETS = [
   './',
   './index.html',
@@ -7,6 +7,13 @@ const ASSETS = [
   './js/app.js',
   './js/router.js',
   './js/store.js',
+  './js/icons.js',
+  './js/finance-model.js',
+  './js/ui.js',
+  './js/views/financeiro-settings.js',
+  './js/views/finance-analysis.js',
+  './js/views/receita.js',
+  './js/views/investimentos.js',
   './js/supabase-client.js',
   './js/views/login.js',
   './js/views/home.js',
@@ -40,16 +47,34 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Network-first para tudo: sempre tenta buscar a versão mais nova primeiro
-// (evita telas desatualizadas ao publicar mudanças) e só cai no cache
-// (pra funcionar offline) se a rede falhar.
+// Network-first para arquivos locais. Serviços externos (como autenticação)
+// e requisições de escrita ficam sob responsabilidade do navegador.
 self.addEventListener('fetch', (event) => {
   const req = event.request;
-  event.respondWith(
-    fetch(req).then((res) => {
-      const copy = res.clone();
-      caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
+  if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
+
+  event.respondWith((async () => {
+    try {
+      const res = await fetch(req);
+      if (res.ok) {
+        const copy = res.clone();
+        event.waitUntil(
+          caches.open(CACHE_NAME).then((cache) => cache.put(req, copy)).catch(() => {})
+        );
+      }
       return res;
-    }).catch(() => caches.match(req).then((cached) => cached || (req.mode === 'navigate' ? caches.match('./index.html') : undefined)))
-  );
+    } catch {
+      const cache = await caches.open(CACHE_NAME).catch(() => null);
+      const cached = cache && await cache.match(req).catch(() => null);
+      if (cached) return cached;
+      if (req.mode === 'navigate' && cache) {
+        const page = await cache.match('./index.html').catch(() => null);
+        if (page) return page;
+      }
+      return new Response('Forja indisponível. Verifique a conexão e tente novamente.', {
+        status: 503,
+        headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+      });
+    }
+  })());
 });
