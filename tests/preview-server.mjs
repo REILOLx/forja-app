@@ -19,7 +19,10 @@ http.createServer(async(req,res)=>{
   let body;
   if(relative==='js/supabase-client.js')body=stub;
   else if(relative==='service-worker.js')body='// Sem cache no teste visual.';
-  else { body=await fs.readFile(target); if(relative==='index.html')body=body.toString().replace(/<script src="https:\/\/cdn[^>]+><\/script>/,''); }
+  else { body=await fs.readFile(target); if(relative==='index.html') {
+    body=body.toString().replace(/<script src="https:\/\/cdn[^>]+><\/script>/,'');
+    if(url.searchParams.has('safe-area')) body=body.replace('</head>','<style>:root{--safe-top:47px;--safe-bottom:34px}</style></head>');
+  } }
   res.writeHead(200,{'Content-Type':types[path.extname(target)]||'text/plain','Cache-Control':'no-store'});res.end(body);
  }catch{res.writeHead(404);res.end('Not found');}
 }).listen(5174,'127.0.0.1',()=>console.log('Prévia de teste isolada: http://127.0.0.1:5174'));
