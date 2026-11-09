@@ -52,10 +52,26 @@ export function render(state) {
           <section class="card finance-section"><h2>Receitas do mês</h2>${incomePreview(ym)}</section>
         </div>
       </div>
-      <section class="finance-section"><div><h2>No seu horizonte</h2><p class="page-description">Próximos 3 meses · com os compromissos já cadastrados.</p></div>
-      <div class="forecast-grid">${[1,2,3].map(n=>{const m=store.addMonths(ym,n),s=store.financialSummary(m);return `<button class="card forecast" data-forecast-month="${m}"><small>${monthLabel(m,true)}</small><strong class="${s.balance<0?'negative':'positive'}">${store.formatMoney(s.balance)}</strong><p>Entradas ${store.formatMoney(s.income+s.redeemed)}<br>Despesas ${store.formatMoney(s.expenses)}<br>Aporte do mês ${store.formatMoney(s.invested)}<br>Patrimônio previsto ${store.formatMoney(s.projectedAssets)}</p></button>`;}).join('')}</div>
-      <p class="hint">Projeção baseada em recorrências, parcelas e lançamentos previstos. Não estima juros, rentabilidade ou despesas ainda não registradas. O limite especial é provisionado integralmente até ser atualizado.</p></section>
+      ${spendingHorizon(ym)}
     `}</div>`;
+}
+function spendingHorizon(ym) {
+  return `<section class="finance-section" aria-label="Planejamento de gastos e investimentos"><div><h2>Seu planejamento dos próximos meses</h2><p class="page-description">Acompanhe as faturas, a margem no teto de 80% e quanto pode investir.</p></div>
+    <div class="forecast-grid">${[1,2,3].map(n=>{
+      const month=store.addMonths(ym,n),plan=store.monthlySpendingPlan(month);
+      return `<button class="card forecast" data-forecast-month="${month}"><small>${monthLabel(month,true)}</small>
+        <strong class="forecast-primary ${plan.income===0?'':plan.headroom<0?'negative':'positive'}">${plan.income===0?'Sem receitas':store.formatMoney(Math.abs(plan.headroom))}</strong>
+        <span class="forecast-label">${plan.income===0?'Cadastre a renda para calcular a margem':plan.headroom<0?'acima do teto de gastos':'de margem para novos gastos'}</span>
+        <dl class="forecast-details"><div><dt>Receitas</dt><dd>${store.formatMoney(plan.income)}</dd></div>
+          <div><dt>Despesas previstas</dt><dd>${store.formatMoney(plan.expenses)}</dd></div>
+          <div><dt>Faturas incluídas nas despesas</dt><dd>${store.formatMoney(plan.cardExpenses)}</dd></div>
+          <div><dt>Aportes planejados</dt><dd>${store.formatMoney(plan.invested)}</dd></div>
+          <div><dt>Potencial total para investir</dt><dd>${store.formatMoney(plan.investmentPotential)}</dd></div></dl>
+        ${plan.investmentShortfall>0?`<p class="negative">Faltam ${store.formatMoney(plan.investmentShortfall)} nas entradas previstas para cobrir despesas e aportes. Revise o planejamento.</p>`:''}
+      </button>`;
+    }).join('')}</div>
+    <p class="hint">A margem considera os gastos já previstos e não é saldo em conta nem limite do cartão. Compras no crédito devem entrar no mês da fatura. Ao atualizar a fatura, a margem e o potencial de investimento são recalculados.</p>
+    <p class="hint">O potencial é o total da renda que restaria depois das despesas cadastradas, incluindo os aportes já planejados. Novos gastos reduzem essa estimativa; ela não cria investimentos nem altera seu patrimônio. Toque em um mês para revisar o planejamento.</p></section>`;
 }
 function initialMonthForm(state,ym) {
   if(ym>store.monthKey())return '';
@@ -95,7 +111,7 @@ function ledger(state,ym) {
 export function afterRender(container, {render}) {
   bindMonthPicker(container,render);
   container.querySelectorAll('[data-finance-tab]').forEach(el=>el.addEventListener('click',()=>{tab=el.dataset.financeTab;editingEntry=null;render();}));
-  container.querySelectorAll('[data-forecast-month]').forEach(el=>el.addEventListener('click',()=>{store.selectFinanceMonth(el.dataset.forecastMonth);render();}));
+  container.querySelectorAll('[data-forecast-month]').forEach(el=>el.addEventListener('click',()=>{store.selectFinanceMonth(el.dataset.forecastMonth);render();container.scrollTop=0;}));
   if(tab==='commitments') settings.afterRender(container,{render});
   container.querySelector('#ledger-filter')?.addEventListener('change',ev=>{filter=ev.target.value;render();});
   const ym=store.selectedFinanceMonth();

@@ -195,6 +195,44 @@ test('conciliação impede duplicar aporte e saldo ou atribuir patrimônio antig
  store.addFinanceEntry({type:'valuation',amount:100,date:'2026-11-02',asset:'Reserva',status:'confirmed',recurring:false});
  assert.throws(()=>store.reconcileInitialMonth({accountBalance:0,includeValuationsAsContributions:true}));
 });
+test('planejamento destaca margem de gastos mesmo quando todo o restante está investido',()=>{
+ clean();const f=store.getState().finance;f.fixedBills=[];f.cards=[];f.loans=[];f.lisHistory={};
+ store.addCard({name:'Cartão',limit:10000,dueDay:10});const card=f.cards[0];
+ store.addFinanceEntry({type:'income',amount:8000,date:'2026-12-01',status:'planned',recurring:false});
+ store.addFinanceEntry({type:'expense',amount:5970.44,date:'2026-12-02',status:'planned',recurring:false});
+ store.addFinanceEntry({type:'valuation',amount:2080.67,date:'2026-11-09',asset:'Reserva',status:'confirmed',recurring:false});
+ store.addFinanceEntry({type:'investment',amount:2029.56,date:'2026-12-03',asset:'Reserva',status:'planned',recurring:false});
+ const before=store.monthlySpendingPlan('2026-12');
+ assert.equal(before.balance,0);assert.equal(before.headroom,429.56);
+ assert.equal(before.investmentPotential,2029.56);assert.equal(before.investmentShortfall,0);
+ assert.equal(before.projectedAssets,4110.23);
+ store.setCardInvoice(card.id,'2026-12',300);
+ const after=store.monthlySpendingPlan('2026-12');
+ assert.equal(after.headroom,129.56);assert.equal(after.cardExpenses,300);
+ assert.equal(after.expenses,6270.44);assert.equal(after.investmentPotential,1729.56);
+ assert.equal(after.investmentShortfall,300);
+ assert.equal(after.projectedAssets,4110.23);assert.equal(after.assets,2080.67);
+ const entry=store.financeEntries('2026-12').find(e=>e.type==='investment');
+ store.updateFinanceOccurrence(entry.id,'2026-12',{amount:1729.56});
+ assert.equal(store.monthlySpendingPlan('2026-12').investmentShortfall,0);
+ assert.equal(store.monthlySpendingPlan('2026-12').headroom,129.56);
+ assert.equal(store.monthlySpendingPlan('2026-11').cardExpenses,0);
+});
+test('potencial de investimento é estimativa e não cria aportes ou duplica faturas',()=>{
+ clean();const f=store.getState().finance;f.fixedBills=[];f.cards=[];f.loans=[];f.lisHistory={};
+ store.addFinanceEntry({type:'income',amount:4000,date:'2027-01-01',status:'planned',recurring:false});
+ store.addFinanceEntry({type:'expense',amount:1801.43,date:'2027-01-02',status:'planned',recurring:false});
+ store.addCard({name:'Cartão',limit:4000,dueDay:10});const card=f.cards[0];
+ store.addCardCharge({cardId:card.id,desc:'Compra',totalAmount:1000,installments:2,startMonth:'2027-01'});
+ store.setCardInvoice(card.id,'2027-01',600);
+ const before=store.exportData(),plan=store.monthlySpendingPlan('2027-01');
+ assert.equal(plan.cardExpenses,600);assert.equal(plan.expenses,2401.43);
+ assert.equal(plan.headroom,798.57);assert.equal(plan.investmentPotential,1598.57);
+ assert.equal(plan.invested,0);assert.equal(plan.projectedAssets,0);assert.equal(store.exportData(),before);
+ store.setCardInvoice(card.id,'2027-01',4500);
+ assert.equal(store.monthlySpendingPlan('2027-01').investmentPotential,0);
+ assert.equal(store.monthlySpendingPlan('2027-01').headroom,-3101.43);
+});
 
 test('teto de gastos é 80% das receitas do próprio mês, incluindo 13º',()=>{
  clean();store.addFinanceEntry({type:'income',amount:5000,date:'2026-11-05',status:'planned',description:'Salário',recurring:true});

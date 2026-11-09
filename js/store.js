@@ -866,3 +866,11 @@ export function monthlyAnalysis(ym = selectedFinanceMonth()) {
     change: sum([summary.expenses, -previous.expenses]),
     changePct: previous.expenses > 0 ? Math.round((summary.expenses / previous.expenses - 1) * 1000) / 10 : null };
 }
+
+export function monthlySpendingPlan(ym = selectedFinanceMonth()) {
+  const analysis = monthlyAnalysis(ym);
+  const cardExpenses = monthCommitted(ym).cards;
+  return { ...analysis, cardExpenses,
+    investmentPotential: Math.max(0, sum([analysis.income, -analysis.expenses])),
+    investmentShortfall: Math.max(0, sum([analysis.expenses, analysis.invested, -analysis.income, -analysis.redeemed])) };
+}

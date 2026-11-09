@@ -366,3 +366,11 @@ h2 { font-size: 17px; font-weight: 700; }
   input:not([type="checkbox"]):not([type="range"]):not([type="file"]),
   select, textarea { font-size: 16px !important; }
 }
+
+.forecast .forecast-primary { display:block; font-size:24px; line-height:1.2; }
+.forecast .forecast-label { display:block; font-size:12px; line-height:1.5; margin-top:6px; }
+.forecast-details { margin:18px 0 0; padding-top:14px; border-top:1px solid var(--border); }
+.forecast-details div { display:flex; justify-content:space-between; gap:12px; margin-top:10px; font-size:12px; line-height:1.5; }
+.forecast-details dt { color:var(--text-dim); }
+.forecast-details dd { margin:0; white-space:nowrap; text-align:right; }
+@media (max-width:600px) { .forecast-grid { grid-template-columns:1fr; } .forecast { padding:20px; } }
