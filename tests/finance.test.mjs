@@ -63,6 +63,35 @@ test('backup restaura novas funcionalidades e rejeita arquivo incompatível',()=
  clean();const backup=store.exportData();store.importData(backup);assert.equal(store.exportData(),backup);
  assert.throws(()=>store.importData('{}'));assert.throws(()=>store.addFinanceEntry({type:'income',amount:NaN,date:'2026-11-01'}));
 });
+test('investimentos nunca compõem gastos ou teto, mas transferem caixa para patrimônio',()=>{
+ clean();
+ store.addFinanceEntry({type:'income',amount:5000,date:'2026-11-01',status:'confirmed',recurring:false});
+ store.addFinanceEntry({type:'expense',amount:100,date:'2026-11-02',status:'confirmed',recurring:false});
+ const before=store.financialSummary('2026-11');
+ const analysis=store.monthlyAnalysis('2026-11');
+ const add=(type,amount,date,status='confirmed')=>store.addFinanceEntry({type,amount,date,status,asset:'Reserva',category:'Renda fixa',recurring:false});
+ add('valuation',1000,'2026-11-01');
+ add('investment',200,'2026-11-03');
+ add('yield',10,'2026-11-04');
+ add('redemption',50,'2026-11-05');
+ add('investment',300,'2026-11-06','planned');
+ const after=store.financialSummary('2026-11');
+ assert.equal(after.expenses,before.expenses);
+ assert.equal(store.monthCommitted('2026-11').variable,100);
+ assert.equal(after.invested,500);
+ assert.equal(after.balance,before.balance-500+50);
+ assert.equal(after.assets,1160);
+ for(const key of ['ceiling','headroom','spendingRatio','change','changePct']) {
+  assert.equal(store.monthlyAnalysis('2026-11')[key],analysis[key],key);
+ }
+ const planned=store.financeEntries('2026-11').find(e=>e.type==='investment'&&e.status==='planned');
+ store.updateFinanceOccurrence(planned.id,'2026-11',{status:'confirmed'});
+ assert.equal(store.financialSummary('2026-11').assets,1460);
+ assert.equal(store.financialSummary('2026-11').expenses,before.expenses);
+ store.updateFinanceOccurrence(planned.id,'2026-11',{deleted:true});
+ assert.equal(store.financialSummary('2026-11').balance,before.balance-200+50);
+ assert.equal(store.financialSummary('2026-12').invested,0);
+});
 test('datas locais e virada de ano',()=>{
  assert.equal(store.todayISO(new Date(2026,10,3,23,50)),'2026-11-03');assert.equal(store.monthKey(new Date(2026,10,30,23,50)),'2026-11');
  assert.equal(store.addMonths('2026-12',1),'2027-01');

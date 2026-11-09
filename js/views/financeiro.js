@@ -7,7 +7,7 @@ import { escapeHTML as esc, monthLabel, monthPicker, bindMonthPicker, toast } fr
 let tab = 'overview';
 let filter = 'all';
 let editingEntry = null;
-const TYPES = { income:'Receita',expense:'Despesa',investment:'Aporte',redemption:'Resgate',yield:'Rendimento',valuation:'Saldo atualizado' };
+const TYPES = { income:'Receita',expense:'Despesa',investment:'Investimento · aporte',redemption:'Resgate',yield:'Rendimento',valuation:'Saldo atualizado' };
 export function render(state) {
   const ym = store.selectedFinanceMonth();
   const summary = store.financialSummary(ym);
@@ -16,13 +16,13 @@ export function render(state) {
   return `<div class="page-heading"><div><div class="eyebrow">Planeje. Acompanhe. Evolua.</div><h1>Financeiro</h1><p class="page-description">Uma visão clara do seu presente e do que vem pela frente.</p></div><a href="#/config" class="icon-button" aria-label="Ajustes e backup">${icon.gear()}</a></div>
     ${monthPicker()}
     <section class="hero-balance" aria-label="Resumo do mês">
-      <div class="row"><span class="section-label" style="margin:0;color:var(--ember)">Saldo previsto do mês</span><span class="pill pill-dim">${ym > store.monthKey() ? 'Planejamento' : ym < store.monthKey() ? 'Histórico' : 'Mês atual'}</span></div>
+      <div class="row"><span class="section-label" style="margin:0;color:var(--ember)">Disponível na conta · previsto</span><span class="pill pill-dim">${ym > store.monthKey() ? 'Planejamento' : ym < store.monthKey() ? 'Histórico' : 'Mês atual'}</span></div>
       <div class="hero-amount ${summary.balance < 0 ? 'negative' : ''}">${store.formatMoney(summary.balance)}</div>
-      <p class="hint">Receitas + resgates − despesas − aportes. É uma previsão mensal, não o saldo da sua conta.</p>
+      <p class="hint">Receitas + resgates − despesas − investimentos. Aportes são transferências para seu patrimônio e não entram nos gastos nem no teto de 80%. Este valor é uma previsão, não o saldo bancário.</p>
       <div class="hero-foot"><span>${store.formatMoney(summary.received)} em receitas confirmadas</span><span>·</span><span>${store.formatMoney(summary.income - summary.received)} a receber</span></div>
     </section>
     <div class="metric-grid">
-      ${metric('Receitas previstas', summary.income, 'positive')}${metric('Despesas previstas', summary.expenses)}${metric('Aportes do mês', summary.invested)}${metric('Patrimônio registrado', summary.assets, 'positive')}
+      ${metric('Receitas previstas', summary.income, 'positive')}${metric('Despesas previstas', summary.expenses)}${metric('Investimentos do mês', summary.invested, 'positive')}${metric('Patrimônio registrado', summary.assets, 'positive')}
     </div>
     <div class="quick-actions">
       <a href="#/financeiro/receita" class="card quick-action">${icon.plus()}<span>Nova receita</span></a>
@@ -38,7 +38,7 @@ export function render(state) {
       ${renderAnalysis(ym)}
       <div class="finance-columns">
         <section class="card finance-section"><div class="row"><h2>Destino do seu dinheiro</h2><a href="#/financeiro/pagamentos" class="hint" style="color:var(--ember)">Ver pagamentos →</a></div>
-          ${[['Contas fixas',parts.bills],['Faturas de cartão',parts.cards],['Empréstimos',parts.loans],['Despesas avulsas',parts.variable],['Limite especial provisionado',parts.lis]].map(([label,value])=>`<div class="finance-row"><span><strong>${label}</strong></span><span class="amount">${store.formatMoney(value)}</span></div>`).join('')}
+          ${[['Contas fixas',parts.bills],['Faturas de cartão',parts.cards],['Empréstimos',parts.loans],['Despesas avulsas',parts.variable],['Limite especial provisionado',parts.lis],['Investimentos · fora dos gastos',summary.invested]].map(([label,value])=>`<div class="finance-row"><span><strong>${label}</strong></span><span class="amount">${store.formatMoney(value)}</span></div>`).join('')}
         </section>
         <div class="finance-section">
           <section class="card finance-section"><h2>Seu teto de gastos · 80%</h2>
@@ -51,7 +51,7 @@ export function render(state) {
         </div>
       </div>
       <section class="finance-section"><div><h2>No seu horizonte</h2><p class="page-description">Próximos 3 meses · com os compromissos já cadastrados.</p></div>
-      <div class="forecast-grid">${[1,2,3].map(n=>{const m=store.addMonths(ym,n),s=store.financialSummary(m);return `<button class="card forecast" data-forecast-month="${m}"><small>${monthLabel(m,true)}</small><strong class="${s.balance<0?'negative':'positive'}">${store.formatMoney(s.balance)}</strong><p>Entradas ${store.formatMoney(s.income+s.redeemed)}<br>Saídas ${store.formatMoney(s.expenses+s.invested)}</p></button>`;}).join('')}</div>
+      <div class="forecast-grid">${[1,2,3].map(n=>{const m=store.addMonths(ym,n),s=store.financialSummary(m);return `<button class="card forecast" data-forecast-month="${m}"><small>${monthLabel(m,true)}</small><strong class="${s.balance<0?'negative':'positive'}">${store.formatMoney(s.balance)}</strong><p>Entradas ${store.formatMoney(s.income+s.redeemed)}<br>Despesas ${store.formatMoney(s.expenses)}<br>Investimentos ${store.formatMoney(s.invested)}</p></button>`;}).join('')}</div>
       <p class="hint">Projeção baseada em recorrências, parcelas e lançamentos previstos. Não estima juros, rentabilidade ou despesas ainda não registradas. O limite especial é provisionado integralmente até ser atualizado.</p></section>
     `}</div>`;
 }

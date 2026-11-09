@@ -18,6 +18,7 @@ em `js/supabase-client.js` e a tabela Supabase `app_state` já utilizada pelo ap
 - Compras parceladas mantêm sua projeção para os meses seguintes, até que cada fatura seja informada. A primeira parcela entra no mês da data de referência.
 - Em Lançamentos, confirme, edite ou exclua uma ocorrência. Encerrar repetição mantém as ocorrências anteriores.
 - Contas fixas e orçamento legado são versionados a partir do mês selecionado. Os valores anteriores são preservados.
+- O resumo e as projeções exibem despesas e investimentos separadamente. O disponível na conta desconta os aportes por serem transferências para a carteira, sem incluí-los nos gastos ou no teto de 80%.
 - Investimentos aceitam saldo inicial/atual, aporte, resgate e rendimento. Só registros confirmados compõem o patrimônio; saldos não movimentam caixa. Não há conexão automática com bancos.
 - O gráfico compara seis meses; os trechos futuros são pontilhados. A comparação inclui obrigações previstas, não apenas pagamentos confirmados.
 - O LIS é provisionado integralmente a partir do primeiro registro até uma nova atualização, sem estimar juros.

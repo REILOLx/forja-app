@@ -109,6 +109,6 @@ export function render(state) {
         </div>
       </div>
     ` : ''}
-    <a href="#/financeiro" class="card row" style="color:inherit;gap:16px"><div><div class="section-label">Seu mês em perspectiva</div><div class="fjc" style="font-size:24px;color:${finances.balance < 0 ? 'var(--red)' : 'var(--ember)'}">${formatMoney(finances.balance)}</div><p class="hint">Saldo previsto · revise suas entradas e compromissos</p></div>${icon.chevronRight()}</a>
+    <a href="#/financeiro" class="card row" style="color:inherit;gap:16px"><div><div class="section-label">Seu mês em perspectiva</div><div class="fjc" style="font-size:24px;color:${finances.balance < 0 ? 'var(--red)' : 'var(--ember)'}">${formatMoney(finances.balance)}</div><p class="hint">Disponível na conta · após despesas e investimentos</p></div>${icon.chevronRight()}</a>
   `;
 }
