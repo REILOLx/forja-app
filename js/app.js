@@ -227,6 +227,7 @@ const ACTIONS = {
     store.addLoan({
       name: f.name || 'Empréstimo', bank: f.bank || '', totalAmount: f.totalAmount,
       installments: Math.max(parseInt(f.installments, 10), 1),
+      startMonth: f.startMonth || store.selectedFinanceMonth(), monthlyAmount: f.monthlyAmount || undefined,
     });
     closeEmprestimosForms();
   },

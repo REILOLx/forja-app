@@ -233,6 +233,45 @@ test('potencial de investimento é estimativa e não cria aportes ou duplica fat
  assert.equal(store.monthlySpendingPlan('2027-01').investmentPotential,0);
  assert.equal(store.monthlySpendingPlan('2027-01').headroom,-3101.43);
 });
+test('45 parcelas de fevereiro de 2027 até outubro de 2030 são provisionadas sem antecipar cobranças',()=>{
+ clean();const f=store.getState().finance;f.fixedBills=[];f.cards=[];f.loans=[];f.lisHistory={};
+ store.addLoan({name:'Crédito do trabalhador',bank:'Agibank',totalAmount:60730.2,installments:45,monthlyAmount:1349.56});
+ const loan=f.loans[0];store.updateLoan(loan.id,{includedInNetSalary:true});
+ store.configureLoanSchedule(loan.id,{startMonth:'2027-02',installments:45,monthlyAmount:1349.56,provisionMonthly:true});
+ for(const month of ['2026-11','2026-12','2027-01','2030-11']) assert.equal(store.monthCommitted(month).total,0,month);
+ const schedule=store.loanSchedule(loan);
+ assert.equal(schedule.length,45);assert.equal(schedule[0].month,'2027-02');assert.equal(schedule.at(-1).month,'2030-10');
+ assert.equal(schedule.reduce((c,p)=>c+Math.round(p.amount*100),0),6073020);
+ for(const p of schedule){
+  assert.equal(p.status,'planned');assert.equal(p.inNetSalary,false);
+  assert.equal(store.monthCommitted(p.month).loans,1349.56,p.month);
+ }
+ assert.equal(store.loanDeductedFromNetSalary(loan,'2026-11'),true);
+ assert.equal(loan.paidInstallments,0);
+ assert.throws(()=>store.togglePaid('2027-02','loan:'+loan.id));
+ assert.throws(()=>store.togglePaid('2027-01','loan:'+loan.id));
+ assert.equal(loan.paidInstallments,0);
+});
+test('confirmação de uma parcela só altera seu mês e não desloca as 45 cobranças',t=>{
+ t.mock.timers.enable({apis:['Date'],now:new Date('2027-02-15T12:00:00Z').getTime()});
+ clean();store.addLoan({name:'Contrato',totalAmount:60730.2,installments:45,monthlyAmount:1349.56,startMonth:'2027-02'});
+ const loan=store.getState().finance.loans.at(-1),key='loan:'+loan.id;
+ const march=store.monthCommitted('2027-03').total;
+ store.togglePaid('2027-02',key);
+ assert.equal(store.loanSchedule(loan)[0].status,'confirmed');assert.equal(store.loanSchedule(loan)[1].status,'planned');
+ assert.equal(loan.paidInstallments,1);assert.equal(store.monthCommitted('2027-03').total,march);
+ assert.equal(store.loanSchedule(loan).at(-1).month,'2030-10');
+ assert.throws(()=>store.configureLoanSchedule(loan.id,{startMonth:'2027-03',installments:45,monthlyAmount:1349.56,provisionMonthly:true}));
+ store.togglePaid('2027-02',key);assert.equal(loan.paidInstallments,0);
+ assert.equal(store.loanSchedule(loan)[0].status,'planned');
+});
+test('cronograma rejeita dados inválidos sem alterar o contrato',()=>{
+ clean();const loan=store.getState().finance.loans[0],before=store.exportData();
+ const config={startMonth:'2027-02',installments:45,monthlyAmount:1349.56,provisionMonthly:true};
+ for(const invalid of [{startMonth:'2027-13'},{installments:0},{installments:1.5},{monthlyAmount:NaN},{monthlyAmount:0.001}]) {
+  assert.throws(()=>store.configureLoanSchedule(loan.id,{...config,...invalid}));assert.equal(store.exportData(),before);
+ }
+});
 
 test('teto de gastos é 80% das receitas do próprio mês, incluindo 13º',()=>{
  clean();store.addFinanceEntry({type:'income',amount:5000,date:'2026-11-05',status:'planned',description:'Salário',recurring:true});

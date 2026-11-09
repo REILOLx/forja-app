@@ -1,7 +1,7 @@
 import { icon } from '../icons.js';
-import { activeLoanBalance, formatMoney, loanDeductedFromNetSalary } from '../store.js';
+import { activeLoanBalance, formatMoney, loanDeductedFromNetSalary, loanSchedule, selectedFinanceMonth } from '../store.js';
 
-import { monthPicker, bindMonthPicker } from '../ui.js';
+import { monthPicker, bindMonthPicker, monthLabel, toast } from '../ui.js';
 
 const CIRC = 2 * Math.PI * 15.5;
 let editingLoanId = null;
@@ -32,12 +32,14 @@ export function render(state) {
     </div>
 
     ${monthPicker()}
-    <p class="hint">O mês selecionado será o início das parcelas de novos empréstimos. Os contratos legados têm o início estimado pela quantidade de parcelas pagas.</p>
+    <p class="hint">Defina o mês da primeira cobrança e o número de parcelas. Cada parcela é provisionada no mês correspondente e permanece prevista até você confirmar o pagamento em Pagamentos.</p>
     ${loans.map((l) => {
       const pct = l.installments ? l.paidInstallments / l.installments : 0;
       const remaining = activeLoanBalance(l);
       const color = remaining === 0 ? 'var(--green)' : pct > 0.6 ? 'var(--green)' : 'var(--ember)';
       const isEditing = editingLoanId === l.id;
+      const schedule = loanSchedule(l);
+      const selected = schedule.find(p=>p.month===selectedFinanceMonth());
       return `
         <div class="card">
           <div class="row" style="align-items:flex-start;margin-bottom:10px;">
@@ -49,24 +51,31 @@ export function render(state) {
           </div>
           ${isEditing ? `
             <div class="stack gap-8">
-              <label class="recurring-option"><input type="checkbox" data-loan-field="includedInNetSalary" data-loan-id="${l.id}" ${loanDeductedFromNetSalary(l)?'checked':''}><span>Parcela já descontada do salário líquido informado. Não descontar novamente no caixa ou no teto de gastos.</span></label><input type="text" data-loan-field="name" data-loan-id="${l.id}" value="${l.name}" placeholder="Nome">
-              <label class="field">Mês da primeira parcela<input type="month" data-loan-field="startMonth" data-loan-id="${l.id}" value="${l.startMonth}"></label>
+              <input type="text" data-loan-field="name" data-loan-id="${l.id}" value="${l.name}" placeholder="Nome">
+
               <input type="text" data-loan-field="bank" data-loan-id="${l.id}" value="${l.bank}" placeholder="Banco">
               <div class="row gap-8">
-                <input type="number" data-loan-field="totalAmount" data-loan-id="${l.id}" value="${l.totalAmount}" placeholder="Valor total" style="flex:1;">
-                <input type="number" data-loan-field="installments" data-loan-id="${l.id}" value="${l.installments}" placeholder="Nº parcelas" style="flex:1;">
+                <label class="field" style="flex:1">Valor total do contrato (R$)<input type="number" data-loan-field="totalAmount" data-loan-id="${l.id}" value="${l.totalAmount}" step="0.01"></label>
+
               </div>
               <div class="row gap-8">
-                <input type="number" data-loan-field="paidInstallments" data-loan-id="${l.id}" value="${l.paidInstallments}" placeholder="Parcelas pagas" style="flex:1;">
-                <input type="number" data-loan-field="monthlyAmount" data-loan-id="${l.id}" value="${l.monthlyAmount}" placeholder="Valor da parcela" style="flex:1;">
+                <label class="field" style="flex:1">Parcelas pagas no histórico<input type="number" data-loan-field="paidInstallments" data-loan-id="${l.id}" value="${l.paidInstallments}" min="0" max="${l.installments}" step="1"></label>
+
               </div>
+              <form data-loan-schedule-form="${l.id}" class="stack gap-10">
+                <label class="field">Mês da primeira cobrança<input name="startMonth" type="month" value="${l.startMonth}" required></label>
+                <div class="form-grid"><label class="field">Quantidade de parcelas<input name="installments" type="number" min="1" max="600" step="1" value="${l.installments}" required></label><label class="field">Parcela mensal (R$)<input name="monthlyAmount" type="number" min="0.01" step="0.01" value="${l.monthlyAmount}" required></label></div>
+                <label class="recurring-option"><input name="provisionMonthly" type="checkbox" ${!loanDeductedFromNetSalary(l,l.startMonth)?'checked':''}><span><strong>Provisionar a parcela mensal no planejamento</strong><small>Reserva esse valor em cada mês a partir da primeira cobrança. Marque quando a receita cadastrada ainda não inclui esse desconto.</small></span></label>
+                <p class="hint">Antes do início e depois da última parcela, nada é provisionado. A confirmação do pagamento não desloca as próximas parcelas. A opção acima define o tratamento de todas as parcelas do contrato.</p>
+                <p class="form-error" data-loan-schedule-error role="alert"></p><button class="btn btn-primary">Salvar cronograma</button>
+              </form>
             </div>
           ` : `
             <div class="row gap-14" style="align-items:center;">
               ${ring(pct, color)}
               <div style="flex:1;">
                 <div style="font-size:14.5px;font-weight:700;margin-bottom:4px;">${l.name}</div>
-                <div class="muted" style="font-size:12px;margin-bottom:2px;">${l.bank}</div>${loanDeductedFromNetSalary(l)?'<p class="hint">Já descontado do salário líquido · sem novo débito no caixa.</p>':''}
+                <div class="muted" style="font-size:12px;margin-bottom:2px;">${l.bank}</div>${selected?.inNetSalary?'<p class="hint">Já descontado do salário líquido · sem novo débito no caixa.</p>':''}
                 <div class="muted" style="font-size:12px;">${remaining === 0 ? 'Quitado' : `Faltam ${remaining} de ${l.installments} parcelas`}</div>
               </div>
             </div>
@@ -81,6 +90,9 @@ export function render(state) {
               </div>
             </div>
           `}
+          <p class="hint" style="margin-top:14px">Primeira cobrança: ${monthLabel(l.startMonth)} · Última: ${monthLabel(schedule.at(-1).month)} · ${l.installments} parcelas.</p>
+          <p class="hint">${selected?`Neste mês: parcela ${selected.number}/${l.installments} · ${selected.status==='confirmed'?'Pagamento confirmado':'Prevista · aguardando confirmação'} · ${formatMoney(selected.amount)}`:selectedFinanceMonth()<l.startMonth?'Ainda não começou: sem provisão no mês selecionado.':'Sem parcela no mês selecionado.'}</p>
+          <details class="details-panel"><summary>Ver as ${l.installments} parcelas</summary><div class="stack gap-8">${schedule.map(p=>`<button type="button" class="row card card-tight" data-loan-month="${p.month}" style="text-align:left;color:inherit"><span><strong>${p.number}/${l.installments} · ${monthLabel(p.month,true)}</strong><small style="display:block">${p.status==='confirmed'?'Pago':'Previsto'}${p.inNetSalary?' · já incluído no salário líquido':''}</small></span><strong>${formatMoney(p.amount)}</strong></button>`).join('')}</div></details>
         </div>`;
     }).join('') || '<div class="muted">Nenhum empréstimo cadastrado.</div>'}
 
@@ -92,14 +104,16 @@ export function render(state) {
         <input type="text" data-field="name" placeholder="Nome (ex: Empréstimo pessoal)">
         <input type="text" data-field="bank" placeholder="Banco / instituição">
         <input type="number" data-field="totalAmount" step="0.01" min="0" placeholder="Valor total (R$)">
-        <input type="number" data-field="installments" min="1" max="120" placeholder="Número de parcelas">
+        <label class="field">Número de parcelas<input type="number" data-field="installments" min="1" max="600" placeholder="Número de parcelas"></label>
+        <label class="field">Primeira cobrança<input type="month" data-field="startMonth" value="${selectedFinanceMonth()}"></label>
+        <label class="field">Parcela mensal (R$)<input type="number" data-field="monthlyAmount" step="0.01" min="0.01" placeholder="Opcional · total dividido pelas parcelas"></label>
         <button data-action="salvarEmprestimo" class="btn btn-primary">Salvar empréstimo</button>
       </div>
     ` : ''}
   `;
 }
 
-export function afterRender(container, { render }) {
+export function afterRender(container, { render, navigate }) {
   bindMonthPicker(container, render);
   const store = window.__forja.store;
 
@@ -119,6 +133,14 @@ export function afterRender(container, { render }) {
     });
   });
 
+  container.querySelectorAll('[data-loan-schedule-form]').forEach(form=>form.addEventListener('submit',ev=>{
+    ev.preventDefault();
+    try {
+      store.configureLoanSchedule(form.dataset.loanScheduleForm,{startMonth:form.elements.startMonth.value,installments:Number(form.elements.installments.value),monthlyAmount:Number(form.elements.monthlyAmount.value),provisionMonthly:form.elements.provisionMonthly.checked});
+      editingLoanId=null;render();toast('Cronograma salvo. As parcelas ficam previstas até você confirmar cada mês.');
+    }catch(error){form.querySelector('[data-loan-schedule-error]').textContent=error.message;}
+  }));
+  container.querySelectorAll('[data-loan-month]').forEach(button=>button.addEventListener('click',()=>{store.selectFinanceMonth(button.dataset.loanMonth);navigate('/financeiro/pagamentos');}));
   const addBtn = container.querySelector('#btn-toggle-add-loan');
   if (addBtn) addBtn.addEventListener('click', () => { showAddLoan = !showAddLoan; render(); });
 }

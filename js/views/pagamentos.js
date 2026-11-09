@@ -14,7 +14,7 @@ export function render(state) {
  const total=(list)=>list.filter(it=>!it.inNetSalary).reduce((s,it)=>s+Math.round(it.amount*100),0)/100;
  return `${financeHeading('Pagamentos','Confira o que foi pago e o que ainda está previsto.')}${monthPicker()}
  <div class="grid-2"><div class="metric"><span>Pago em ${monthLabel(ym,true)}</span><strong class="positive">${store.formatMoney(total(items.filter(paid)))}</strong></div><div class="metric"><span>A pagar no mês</span><strong>${store.formatMoney(total(items.filter(it=>!paid(it))))}</strong></div></div>
- ${[...new Set(items.map(i=>i.group))].map(g=>`<section class="finance-section"><h2>${g}</h2>${items.filter(it=>it.group===g).map(it=>`<button class="check-row ${paid(it)?'done':''}" style="text-align:left" ${it.legacy?'disabled':''} data-payment-key="${it.key}" data-payment-entry="${!!it.entry}"><span class="check ${paid(it)?'checked':''}">${icon.check()}</span><span class="stack" style="flex:1"><span class="label">${esc(it.label)}</span><span class="hint">${esc(it.sub)}</span></span><strong class="fjc" style="font-size:14px">${store.formatMoney(it.amount)}</strong></button>`).join('')}</section>`).join('')||'<div class="empty-state"><strong>Mês sem compromissos</strong><p>Cadastre contas fixas ou uma nova despesa para começar.</p></div>'}`;
+ ${[...new Set(items.map(i=>i.group))].map(g=>`<section class="finance-section"><h2>${g}</h2>${items.filter(it=>it.group===g).map(it=>`<button class="check-row ${paid(it)?'done':''}" style="text-align:left" ${it.legacy?'disabled':''} aria-label="${paid(it)?'Desfazer confirmação':'Confirmar pagamento'} · ${esc(it.label)}" data-payment-key="${it.key}" data-payment-entry="${!!it.entry}"><span class="check ${paid(it)?'checked':''}">${icon.check()}</span><span class="stack" style="flex:1"><span class="label">${esc(it.label)}</span><span class="hint">${esc(it.sub)} · ${paid(it)?'Pago':'Previsto · a confirmar'}</span></span><strong class="fjc" style="font-size:14px">${store.formatMoney(it.amount)}</strong></button>`).join('')}</section>`).join('')||'<div class="empty-state"><strong>Mês sem compromissos</strong><p>Cadastre contas fixas ou uma nova despesa para começar.</p></div>'}`;
 }
 export function afterRender(container,{render}) {
  bindMonthPicker(container,render);
@@ -24,7 +24,9 @@ export function afterRender(container,{render}) {
   if(el.dataset.paymentEntry==='true'){
    const e=store.financeEntries(ym).find(e=>e.id===el.dataset.paymentKey);
    store.updateFinanceOccurrence(e.id,ym,{status:e.status==='confirmed'?'planned':'confirmed'});
-  }else store.togglePaid(ym,el.dataset.paymentKey);
+  }else {
+   try{store.togglePaid(ym,el.dataset.paymentKey);}catch(error){toast(error.message);return;}
+  }
   render();
  }));
 }

@@ -657,6 +657,34 @@ export function loanDeductedFromNetSalary(loan, ym = selectedFinanceMonth()) {
   return (loan.salaryDeductionHistory || []).filter(v => v.month <= ym)
     .sort((a,b) => a.month.localeCompare(b.month)).at(-1)?.value || false;
 }
+export function configureLoanSchedule(id, { startMonth, installments, monthlyAmount, provisionMonthly }) {
+  const loan = state.finance.loans.find(l => l.id === id);
+  if (!loan || !/^\d{4}-(0[1-9]|1[0-2])$/.test(startMonth) ||
+      !Number.isInteger(installments) || installments < 1 || installments > 600 ||
+      !Number.isFinite(monthlyAmount) || Math.round(monthlyAmount * 100) < 1 || typeof provisionMonthly !== 'boolean') {
+    throw new Error('Informe o mês inicial, a quantidade de parcelas e o valor mensal válidos.');
+  }
+  if ((startMonth !== loan.startMonth || installments !== loan.installments) &&
+      Object.values(state.finance.monthlyPayments).some(payments => payments['loan:' + id])) {
+    throw new Error('Há parcelas confirmadas neste contrato. Desfaça as confirmações antes de reprogramar o cronograma.');
+  }
+  loan.startMonth = startMonth;
+  loan.installments = installments;
+  loan.monthlyAmount = Math.round(monthlyAmount * 100) / 100;
+  // A escolha passa a valer na primeira parcela e substitui configurações
+  // futuras do mesmo contrato, sem criar pagamentos confirmados.
+  loan.salaryDeductionHistory = (loan.salaryDeductionHistory || []).filter(v => v.month < startMonth);
+  loan.salaryDeductionHistory.push({ month: startMonth, value: !provisionMonthly });
+  save();
+}
+export function loanSchedule(loan) {
+  return Array.from({ length: loan.installments }, (_, index) => {
+    const month = addMonths(loan.startMonth,index);
+    return { month, number: index + 1, amount: loanAmountForMonth(loan,month),
+      status: isPaid(month,'loan:' + loan.id) ? 'confirmed' : 'planned',
+      inNetSalary: loanDeductedFromNetSalary(loan,month) };
+  });
+}
 
 export function removeLoan(id) {
   state.finance.loans = state.finance.loans.filter((l) => l.id !== id);
@@ -720,6 +748,11 @@ export function isPaid(ym, key) {
 }
 
 export function togglePaid(ym, key) {
+  if (key.startsWith('loan:')) {
+    const loan = state.finance.loans.find(l => l.id === key.slice(5));
+    if (!loan || loanAt(loan,ym) <= 0) throw new Error('Não existe parcela deste empréstimo neste mês.');
+    if (ym > monthKey()) throw new Error('A parcela futura permanece prevista até o mês da cobrança.');
+  }
   if (!state.finance.monthlyPayments[ym]) state.finance.monthlyPayments[ym] = {};
   const wasPaid = !!state.finance.monthlyPayments[ym][key];
   state.finance.monthlyPayments[ym][key] = !wasPaid;
