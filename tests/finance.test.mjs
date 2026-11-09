@@ -272,6 +272,37 @@ test('cronograma rejeita dados inválidos sem alterar o contrato',()=>{
   assert.throws(()=>store.configureLoanSchedule(loan.id,{...config,...invalid}));assert.equal(store.exportData(),before);
  }
 });
+test('barra do consignado segue as 45 parcelas de fevereiro até 100% em outubro de 2030 sem confirmar comprovantes',()=>{
+ clean();store.addLoan({name:'Crédito do trabalhador',totalAmount:37877,installments:45,monthlyAmount:1349.56,startMonth:'2027-02'});
+ const loan=store.getState().finance.loans.at(-1);
+ for(const month of ['2026-11','2026-12','2027-01']) {
+  assert.equal(store.loanProgress(loan,month).ratio,0);assert.equal(store.loanAmountForMonth(loan,month),0);
+ }
+ assert.equal(store.loanProgress(loan,'2027-02').completed,1);
+ assert.equal(store.loanProgress(loan,'2027-03').completed,2);
+ assert.equal(store.loanProgress(loan,'2027-02').ratio,1/45);
+ assert.equal(store.loanProgress(loan,'2030-10').ratio,1);
+ assert.equal(store.loanProgress(loan,'2030-11').ratio,1);
+ assert.equal(store.loanProgress(loan,'2030-10').confirmed,0);
+ assert.equal(loan.paidInstallments,0);
+ assert.equal(store.loanSchedule(loan).every(p=>p.status==='planned'),true);
+});
+test('confirmar consignado não muda progresso previsto nem desconta a parcela duas vezes',t=>{
+ t.mock.timers.enable({apis:['Date'],now:new Date('2027-02-15T12:00:00Z').getTime()});
+ clean();store.addLoan({name:'Consignado',totalAmount:37877,installments:45,monthlyAmount:1349.56,startMonth:'2027-02'});
+ const loan=store.getState().finance.loans.at(-1),key='loan:'+loan.id;
+ const progress=store.loanProgress(loan,'2027-02'),expenses=store.financialSummary('2027-02').expenses;
+ store.togglePaid('2027-02',key);
+ assert.equal(store.loanProgress(loan,'2027-02').ratio,progress.ratio);
+ assert.equal(store.loanProgress(loan,'2027-02').confirmed,1);
+ assert.equal(store.financialSummary('2027-02').expenses,expenses);
+ store.togglePaid('2027-02',key);
+ assert.equal(store.loanProgress(loan,'2027-02').confirmed,0);
+ assert.equal(store.loanProgress(loan,'2027-02').ratio,progress.ratio);
+ store.configureLoanSchedule(loan.id,{startMonth:'2027-02',installments:45,monthlyAmount:1349.56,provisionMonthly:true,automaticProgress:false});
+ assert.equal(store.loanProgress(loan,'2027-02').automatic,false);
+ assert.equal(store.loanProgress(loan,'2027-02').ratio,0);
+});
 
 test('teto de gastos é 80% das receitas do próprio mês, incluindo 13º',()=>{
  clean();store.addFinanceEntry({type:'income',amount:5000,date:'2026-11-05',status:'planned',description:'Salário',recurring:true});

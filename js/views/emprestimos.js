@@ -1,5 +1,5 @@
 import { icon } from '../icons.js';
-import { activeLoanBalance, formatMoney, loanDeductedFromNetSalary, loanSchedule, selectedFinanceMonth } from '../store.js';
+import { formatMoney, loanDeductedFromNetSalary, loanSchedule, loanProgress, selectedFinanceMonth } from '../store.js';
 
 import { monthPicker, bindMonthPicker, monthLabel, toast } from '../ui.js';
 
@@ -34,8 +34,9 @@ export function render(state) {
     ${monthPicker()}
     <p class="hint">Defina o mês da primeira cobrança e o número de parcelas. Cada parcela é provisionada no mês correspondente e permanece prevista até você confirmar o pagamento em Pagamentos.</p>
     ${loans.map((l) => {
-      const pct = l.installments ? l.paidInstallments / l.installments : 0;
-      const remaining = activeLoanBalance(l);
+      const progress = loanProgress(l);
+      const pct = progress.ratio;
+      const remaining = progress.remaining;
       const color = remaining === 0 ? 'var(--green)' : pct > 0.6 ? 'var(--green)' : 'var(--ember)';
       const isEditing = editingLoanId === l.id;
       const schedule = loanSchedule(l);
@@ -65,6 +66,7 @@ export function render(state) {
               <form data-loan-schedule-form="${l.id}" class="stack gap-10">
                 <label class="field">Mês da primeira cobrança<input name="startMonth" type="month" value="${l.startMonth}" required></label>
                 <div class="form-grid"><label class="field">Quantidade de parcelas<input name="installments" type="number" min="1" max="600" step="1" value="${l.installments}" required></label><label class="field">Parcela mensal (R$)<input name="monthlyAmount" type="number" min="0.01" step="0.01" value="${l.monthlyAmount}" required></label></div>
+                <label class="recurring-option"><input name="automaticProgress" type="checkbox" ${progress.automatic?'checked':''}><span><strong>Consignado · barra avança automaticamente por mês</strong><small>Acompanha o calendário do contrato. A confirmação de pagamento fica separada.</small></span></label>
                 <label class="recurring-option"><input name="provisionMonthly" type="checkbox" ${!loanDeductedFromNetSalary(l,l.startMonth)?'checked':''}><span><strong>Provisionar a parcela mensal no planejamento</strong><small>Reserva esse valor em cada mês a partir da primeira cobrança. Marque quando a receita cadastrada ainda não inclui esse desconto.</small></span></label>
                 <p class="hint">Antes do início e depois da última parcela, nada é provisionado. A confirmação do pagamento não desloca as próximas parcelas. A opção acima define o tratamento de todas as parcelas do contrato.</p>
                 <p class="form-error" data-loan-schedule-error role="alert"></p><button class="btn btn-primary">Salvar cronograma</button>
@@ -76,7 +78,7 @@ export function render(state) {
               <div style="flex:1;">
                 <div style="font-size:14.5px;font-weight:700;margin-bottom:4px;">${l.name}</div>
                 <div class="muted" style="font-size:12px;margin-bottom:2px;">${l.bank}</div>${selected?.inNetSalary?'<p class="hint">Já descontado do salário líquido · sem novo débito no caixa.</p>':''}
-                <div class="muted" style="font-size:12px;">${remaining === 0 ? 'Quitado' : `Faltam ${remaining} de ${l.installments} parcelas`}</div>
+                <div class="muted" style="font-size:12px;">${progress.automatic?`Cronograma: ${progress.completed} de ${l.installments} parcelas · ${remaining} restantes`:(remaining===0?'Quitado':`Faltam ${remaining} de ${l.installments} parcelas`)}</div>
               </div>
             </div>
             <div class="row" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);">
@@ -90,6 +92,7 @@ export function render(state) {
               </div>
             </div>
           `}
+          ${progress.automatic?`<p class="hint">Barra prevista pelo calendário do mês selecionado. Comprovantes confirmados: ${progress.confirmed}/${l.installments}. A provisão mensal já entra no saldo antes da confirmação.</p>`:''}
           <p class="hint" style="margin-top:14px">Primeira cobrança: ${monthLabel(l.startMonth)} · Última: ${monthLabel(schedule.at(-1).month)} · ${l.installments} parcelas.</p>
           <p class="hint">${selected?`Neste mês: parcela ${selected.number}/${l.installments} · ${selected.status==='confirmed'?'Pagamento confirmado':'Prevista · aguardando confirmação'} · ${formatMoney(selected.amount)}`:selectedFinanceMonth()<l.startMonth?'Ainda não começou: sem provisão no mês selecionado.':'Sem parcela no mês selecionado.'}</p>
           <details class="details-panel"><summary>Ver as ${l.installments} parcelas</summary><div class="stack gap-8">${schedule.map(p=>`<button type="button" class="row card card-tight" data-loan-month="${p.month}" style="text-align:left;color:inherit"><span><strong>${p.number}/${l.installments} · ${monthLabel(p.month,true)}</strong><small style="display:block">${p.status==='confirmed'?'Pago':'Previsto'}${p.inNetSalary?' · já incluído no salário líquido':''}</small></span><strong>${formatMoney(p.amount)}</strong></button>`).join('')}</div></details>
@@ -133,10 +136,15 @@ export function afterRender(container, { render, navigate }) {
     });
   });
 
+  container.querySelectorAll('[data-loan-schedule-form]').forEach(form=>{
+    form.elements.startMonth.addEventListener('change',()=>{
+      if(form.elements.automaticProgress.checked&&form.elements.startMonth.value>store.monthKey())form.elements.provisionMonthly.checked=true;
+    });
+  });
   container.querySelectorAll('[data-loan-schedule-form]').forEach(form=>form.addEventListener('submit',ev=>{
     ev.preventDefault();
     try {
-      store.configureLoanSchedule(form.dataset.loanScheduleForm,{startMonth:form.elements.startMonth.value,installments:Number(form.elements.installments.value),monthlyAmount:Number(form.elements.monthlyAmount.value),provisionMonthly:form.elements.provisionMonthly.checked});
+      store.configureLoanSchedule(form.dataset.loanScheduleForm,{startMonth:form.elements.startMonth.value,installments:Number(form.elements.installments.value),monthlyAmount:Number(form.elements.monthlyAmount.value),provisionMonthly:form.elements.provisionMonthly.checked,automaticProgress:form.elements.automaticProgress.checked});
       editingLoanId=null;render();toast('Cronograma salvo. As parcelas ficam previstas até você confirmar cada mês.');
     }catch(error){form.querySelector('[data-loan-schedule-error]').textContent=error.message;}
   }));

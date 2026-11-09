@@ -657,11 +657,21 @@ export function loanDeductedFromNetSalary(loan, ym = selectedFinanceMonth()) {
   return (loan.salaryDeductionHistory || []).filter(v => v.month <= ym)
     .sort((a,b) => a.month.localeCompare(b.month)).at(-1)?.value || false;
 }
-export function configureLoanSchedule(id, { startMonth, installments, monthlyAmount, provisionMonthly }) {
+export function loanProgress(loan, ym = selectedFinanceMonth()) {
+  const automatic = loan.automaticProgress ?? /consignado|credito do trabalhador/.test(
+    loan.name.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase());
+  const scheduled = Math.min(loan.installments, Math.max(0,monthsBetween(loan.startMonth,ym)+1));
+  const confirmed = Math.min(loan.installments,Math.max(0,loan.paidInstallments));
+  const completed = automatic ? scheduled : confirmed;
+  return { automatic, completed, confirmed, remaining: Math.max(0,loan.installments-completed),
+    ratio: loan.installments > 0 ? completed/loan.installments : 0 };
+}
+export function configureLoanSchedule(id, { startMonth, installments, monthlyAmount, provisionMonthly, automaticProgress }) {
   const loan = state.finance.loans.find(l => l.id === id);
   if (!loan || !/^\d{4}-(0[1-9]|1[0-2])$/.test(startMonth) ||
       !Number.isInteger(installments) || installments < 1 || installments > 600 ||
-      !Number.isFinite(monthlyAmount) || Math.round(monthlyAmount * 100) < 1 || typeof provisionMonthly !== 'boolean') {
+      !Number.isFinite(monthlyAmount) || Math.round(monthlyAmount * 100) < 1 || typeof provisionMonthly !== 'boolean' ||
+      (automaticProgress !== undefined && typeof automaticProgress !== 'boolean')) {
     throw new Error('Informe o mês inicial, a quantidade de parcelas e o valor mensal válidos.');
   }
   if ((startMonth !== loan.startMonth || installments !== loan.installments) &&
@@ -671,6 +681,7 @@ export function configureLoanSchedule(id, { startMonth, installments, monthlyAmo
   loan.startMonth = startMonth;
   loan.installments = installments;
   loan.monthlyAmount = Math.round(monthlyAmount * 100) / 100;
+  if (automaticProgress !== undefined) loan.automaticProgress = automaticProgress;
   // A escolha passa a valer na primeira parcela e substitui configurações
   // futuras do mesmo contrato, sem criar pagamentos confirmados.
   loan.salaryDeductionHistory = (loan.salaryDeductionHistory || []).filter(v => v.month < startMonth);

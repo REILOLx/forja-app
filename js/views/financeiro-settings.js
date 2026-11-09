@@ -1,6 +1,7 @@
 import { icon } from '../icons.js';
+import { monthLabel } from '../ui.js';
 import {
-  loanDeductedFromNetSalary, monthPercent, cardInvoiceForMonth, activeLoanBalance, formatMoney, selectedFinanceMonth, fixedBillsForMonth, lisForMonth, loanAmountForMonth,
+  loanProgress, loanDeductedFromNetSalary, monthPercent, cardInvoiceForMonth, activeLoanBalance, formatMoney, selectedFinanceMonth, fixedBillsForMonth, lisForMonth, loanAmountForMonth,
 } from '../store.js';
 
 let editingBudget = false;
@@ -87,8 +88,10 @@ export function render(state) {
         <span style="width:15px;height:15px;color:var(--text-dim-2);display:flex;">${icon.chevronRight()}</span>
       </a>
       <div class="stack gap-8">
-        ${state.finance.loans.filter((l) => loanAmountForMonth(l, ym) > 0).map((l) => {
-          const pctLoan = Math.round((l.paidInstallments / l.installments) * 100);
+        ${state.finance.loans.map((l) => {
+          const progress=loanProgress(l,ym);
+          const pctLoan=Math.round(progress.ratio*100);
+          const provision=loanDeductedFromNetSalary(l,ym)?0:loanAmountForMonth(l,ym);
           return `
             <div class="card">
               <div class="row" style="margin-bottom:8px;align-items:baseline;">
@@ -96,9 +99,10 @@ export function render(state) {
                 <span class="fjc" style="font-size:13px;font-weight:700;color:var(--ember);">${pctLoan}%</span>
               </div>
               <div class="progress-track thin" style="margin-bottom:6px;"><div class="progress-fill" style="width:${pctLoan}%;"></div></div>
-              <div class="muted" style="font-size:11.5px;">Faltam ${activeLoanBalance(l)} de ${l.installments} parcelas · ${formatMoney(l.monthlyAmount)}/mês${loanDeductedFromNetSalary(l,ym)?' · já descontado do salário líquido':''}</div>
+              <div class="muted" style="font-size:11.5px;">${progress.automatic?`Cronograma: ${progress.completed}/${l.installments} · barra automática`:`Faltam ${activeLoanBalance(l)} de ${l.installments} parcelas`} · ${formatMoney(l.monthlyAmount)}/mês</div>
+              <p class="hint">Primeira cobrança: ${monthLabel(l.startMonth)} · Provisionado neste mês: ${formatMoney(provision)}${loanAmountForMonth(l,ym)>0&&loanDeductedFromNetSalary(l,ym)?' · parcela já incluída na receita líquida':''}.</p>
             </div>`;
-        }).join('') || '<div class="muted" style="font-size:13px;">Nenhum empréstimo em aberto.</div>'}
+        }).join('') || '<div class="muted" style="font-size:13px;">Nenhum empréstimo cadastrado.</div>'}
       </div>
     </div>
 
