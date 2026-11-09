@@ -1,5 +1,5 @@
 import { icon } from '../icons.js';
-import { activeLoanBalance, formatMoney } from '../store.js';
+import { activeLoanBalance, formatMoney, loanDeductedFromNetSalary } from '../store.js';
 
 import { monthPicker, bindMonthPicker } from '../ui.js';
 
@@ -49,7 +49,7 @@ export function render(state) {
           </div>
           ${isEditing ? `
             <div class="stack gap-8">
-              <input type="text" data-loan-field="name" data-loan-id="${l.id}" value="${l.name}" placeholder="Nome">
+              <label class="recurring-option"><input type="checkbox" data-loan-field="includedInNetSalary" data-loan-id="${l.id}" ${loanDeductedFromNetSalary(l)?'checked':''}><span>Parcela já descontada do salário líquido informado. Não descontar novamente no caixa ou no teto de gastos.</span></label><input type="text" data-loan-field="name" data-loan-id="${l.id}" value="${l.name}" placeholder="Nome">
               <label class="field">Mês da primeira parcela<input type="month" data-loan-field="startMonth" data-loan-id="${l.id}" value="${l.startMonth}"></label>
               <input type="text" data-loan-field="bank" data-loan-id="${l.id}" value="${l.bank}" placeholder="Banco">
               <div class="row gap-8">
@@ -66,7 +66,7 @@ export function render(state) {
               ${ring(pct, color)}
               <div style="flex:1;">
                 <div style="font-size:14.5px;font-weight:700;margin-bottom:4px;">${l.name}</div>
-                <div class="muted" style="font-size:12px;margin-bottom:2px;">${l.bank}</div>
+                <div class="muted" style="font-size:12px;margin-bottom:2px;">${l.bank}</div>${loanDeductedFromNetSalary(l)?'<p class="hint">Já descontado do salário líquido · sem novo débito no caixa.</p>':''}
                 <div class="muted" style="font-size:12px;">${remaining === 0 ? 'Quitado' : `Faltam ${remaining} de ${l.installments} parcelas`}</div>
               </div>
             </div>
@@ -113,7 +113,7 @@ export function afterRender(container, { render }) {
 
   container.querySelectorAll('[data-loan-field]').forEach((input) => {
     input.addEventListener('change', () => {
-      const val = input.type === 'number' ? parseFloat(input.value || '0') : input.value;
+      const val = input.type === 'checkbox' ? input.checked : input.type === 'number' ? parseFloat(input.value || '0') : input.value;
       store.updateLoan(input.dataset.loanId, { [input.dataset.loanField]: val });
       render();
     });

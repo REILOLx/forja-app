@@ -20,7 +20,9 @@ export function render(state) {
       <div class="hero-amount ${summary.balance < 0 ? 'negative' : ''}">${store.formatMoney(summary.balance)}</div>
       <p class="hint">Receitas + resgates − despesas − investimentos. Aportes são transferências para seu patrimônio e não entram nos gastos nem no teto de 80%. Este valor é uma previsão, não o saldo bancário.</p>
       <div class="hero-foot"><span>${store.formatMoney(summary.received)} em receitas confirmadas</span><span>·</span><span>${store.formatMoney(summary.income - summary.received)} a receber</span></div>
+      ${state.finance.cashReconciliations[ym]?`<p class="hint">Conciliação inicial: ${store.formatMoney(summary.reconciliationAdjustment)}. Ajusta o saldo da conta sem alterar gastos, receitas ou patrimônio. Novos lançamentos continuam alterando a previsão.</p>`:''}
     </section>
+    ${initialMonthForm(state,ym)}
     <div class="metric-grid">
       ${metric('Receitas previstas', summary.income, 'positive')}${metric('Despesas previstas', summary.expenses)}${metric('Investimentos do mês', summary.invested, 'positive')}${metric('Patrimônio previsto acumulado', summary.projectedAssets, 'positive')}
     </div>
@@ -38,7 +40,7 @@ export function render(state) {
       ${renderAnalysis(ym)}
       <div class="finance-columns">
         <section class="card finance-section"><div class="row"><h2>Destino do seu dinheiro</h2><a href="#/financeiro/pagamentos" class="hint" style="color:var(--ember)">Ver pagamentos →</a></div>
-          ${[['Contas fixas',parts.bills],['Faturas de cartão',parts.cards],['Empréstimos',parts.loans],['Despesas avulsas',parts.variable],['Limite especial provisionado',parts.lis],['Investimentos · fora dos gastos',summary.invested]].map(([label,value])=>`<div class="finance-row"><span><strong>${label}</strong></span><span class="amount">${store.formatMoney(value)}</span></div>`).join('')}
+          ${[['Contas fixas',parts.bills],['Faturas de cartão',parts.cards],['Empréstimos',parts.loans],['Despesas avulsas',parts.variable],['Limite especial provisionado',parts.lis],['Investimentos · fora dos gastos',summary.invested],['Empréstimos já descontados do salário · não debitados novamente',parts.payrollLoans]].map(([label,value])=>`<div class="finance-row"><span><strong>${label}</strong></span><span class="amount">${store.formatMoney(value)}</span></div>`).join('')}
         </section>
         <div class="finance-section">
           <section class="card finance-section"><h2>Seu teto de gastos · 80%</h2>
@@ -55,6 +57,20 @@ export function render(state) {
       <p class="hint">Projeção baseada em recorrências, parcelas e lançamentos previstos. Não estima juros, rentabilidade ou despesas ainda não registradas. O limite especial é provisionado integralmente até ser atualizado.</p></section>
     `}</div>`;
 }
+function initialMonthForm(state,ym) {
+  if(ym>store.monthKey())return '';
+  const reconciliation=state.finance.cashReconciliations[ym];
+  const included=store.financeEntries(ym).some(e=>e.type==='valuation'&&e.cashContribution);
+  return `<details class="card finance-section"><summary>Conciliar mês inicial</summary>
+    <form id="initial-month-form" class="stack gap-10" style="margin-top:16px">
+      <p class="hint">Use uma vez para iniciar seu controle com o saldo real. Não cria despesa nem rendimento. A diferença fica registrada como ajuste de conciliação somente neste mês.</p>
+      <label class="field">Saldo real na conta, sem investimentos (R$)<input name="accountBalance" type="number" step="0.01" min="0" value="${reconciliation?.accountBalance??0}" required></label>
+      <label class="recurring-option"><input type="checkbox" name="includeValuations" ${included?'checked':''}><span><strong>Os saldos das aplicações deste mês são dinheiro investido neste mês</strong><small>Reconhece esses valores como aportes, preservando o patrimônio. Use somente se não houver aportes separados para o mesmo dinheiro.</small></span></label>
+      ${state.finance.loans.map(l=>`<label class="recurring-option"><input type="checkbox" name="payrollLoan" value="${esc(l.id)}" ${store.loanDeductedFromNetSalary(l,ym)?'checked':''}><span><strong>${esc(l.name)} já foi descontado do salário líquido</strong><small>Preserva o contrato e evita descontar a parcela novamente, a partir deste mês.</small></span></label>`).join('')}
+      <p class="form-error" id="initial-month-error" role="alert"></p><button class="btn btn-primary">Aplicar conciliação inicial</button>
+      ${reconciliation?'<button type="button" id="clear-cash-reconciliation" class="btn-ghost">Remover somente o ajuste de saldo</button>':''}
+    </form></details>`;
+}
 function metric(label, value, cls='') { return `<div class="metric"><span>${label}</span><strong class="${cls}">${store.formatMoney(value)}</strong></div>`; }
 function incomePreview(ym) {
   const entries=store.financeEntries(ym).filter(e=>e.type==='income');
@@ -66,7 +82,7 @@ function ledger(state,ym) {
   const visible=entries.filter(e=>filter==='all'||e.type===filter).sort((a,b)=>b.date.localeCompare(a.date));
   return `<div class="row gap-10"><h2>Lançamentos do mês</h2><label class="field"><select id="ledger-filter" aria-label="Filtrar lançamentos">${[['all','Todos'],...Object.entries(TYPES)].map(([v,label])=>`<option value="${v}" ${filter===v?'selected':''}>${label}</option>`).join('')}</select></label></div>
     <p class="hint">Movimentos avulsos e recorrentes. Contas fixas, faturas e parcelas estão em <a href="#/financeiro/pagamentos">Pagamentos do mês</a>.</p>
-    ${visible.length ? `<div class="card">${visible.map(e=>`<div class="finance-row" style="align-items:flex-start"><div style="flex:1"><strong>${esc(e.description)}</strong><small>${TYPES[e.type]} · ${e.date.slice(8)}/${e.date.slice(5,7)}${e.recurring?' · mensal':''}${e.asset?` · ${esc(e.asset)}`:''}</small>
+    ${visible.length ? `<div class="card">${visible.map(e=>`<div class="finance-row" style="align-items:flex-start"><div style="flex:1"><strong>${esc(e.description)}</strong><small>${e.type==='valuation'&&e.cashContribution?'Saldo com aporte do mês incluído':TYPES[e.type]} · ${e.date.slice(8)}/${e.date.slice(5,7)}${e.recurring?' · mensal':''}${e.asset?` · ${esc(e.asset)}`:''}</small>
       <span class="pill ${e.status==='confirmed'?'pill-green':'pill-dim'}" style="display:inline-block;margin-top:8px">${e.status==='confirmed'?'Confirmado':'Previsto'}</span>
       <div class="row gap-8" style="justify-content:flex-start;flex-wrap:wrap;margin-top:6px">
         ${e.source==='entry'?`<button class="btn-link" data-entry-toggle="${e.id}">${e.status==='confirmed'?'Marcar previsto':'Confirmar'}</button><button class="btn-link" data-entry-edit="${e.id}">Editar</button>`:''}
@@ -83,6 +99,14 @@ export function afterRender(container, {render}) {
   if(tab==='commitments') settings.afterRender(container,{render});
   container.querySelector('#ledger-filter')?.addEventListener('change',ev=>{filter=ev.target.value;render();});
   const ym=store.selectedFinanceMonth();
+  container.querySelector('#initial-month-form')?.addEventListener('submit',ev=>{
+    ev.preventDefault();const form=ev.currentTarget;
+    try {
+      store.reconcileInitialMonth({accountBalance:Number(form.elements.accountBalance.value),includeValuationsAsContributions:form.elements.includeValuations.checked,payrollLoanIds:[...form.querySelectorAll('[name=payrollLoan]:checked')].map(el=>el.value)},ym);
+      render();toast('Saldo inicial conciliado. Investimentos preservados e fora dos gastos.');
+    }catch(error){container.querySelector('#initial-month-error').textContent=error.message;}
+  });
+  container.querySelector('#clear-cash-reconciliation')?.addEventListener('click',()=>{store.clearCashReconciliation(ym);render();});
   container.querySelectorAll('[data-entry-toggle]').forEach(el=>el.addEventListener('click',()=>{
     const e=store.financeEntries(ym).find(e=>e.id===el.dataset.entryToggle);
     if(e.status!=='confirmed' && e.date>store.todayISO()) {toast('Mantenha os movimentos futuros como previstos.');return;}

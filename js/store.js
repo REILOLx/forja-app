@@ -641,8 +641,21 @@ export function addLoan({ name, bank, totalAmount, installments, monthlyAmount, 
 
 export function updateLoan(id, patch) {
   const l = state.finance.loans.find((x) => x.id === id);
-  if (l) Object.assign(l, patch);
+  if (l) {
+    const { includedInNetSalary, ...fields } = patch;
+    Object.assign(l, fields);
+    if (includedInNetSalary !== undefined) {
+      l.salaryDeductionHistory ||= [];
+      const month = selectedFinanceMonth();
+      l.salaryDeductionHistory = l.salaryDeductionHistory.filter(v => v.month !== month);
+      l.salaryDeductionHistory.push({ month, value: !!includedInNetSalary });
+    }
+  }
   save();
+}
+export function loanDeductedFromNetSalary(loan, ym = selectedFinanceMonth()) {
+  return (loan.salaryDeductionHistory || []).filter(v => v.month <= ym)
+    .sort((a,b) => a.month.localeCompare(b.month)).at(-1)?.value || false;
 }
 
 export function removeLoan(id) {
@@ -726,11 +739,12 @@ export function monthCommitted(ym = monthKey()) {
   const f = state.finance;
   const bills = sum(billsAt(f, ym).map(b => b.amount));
   const cards = sum(f.cards.map(c => cardInvoiceForMonth(c.id, ym)));
-  const loans = sum(f.loans.map(l => loanAt(l, ym)));
+  const loans = sum(f.loans.filter(l => !loanDeductedFromNetSalary(l, ym)).map(l => loanAt(l, ym)));
+  const payrollLoans = sum(f.loans.filter(l => loanDeductedFromNetSalary(l, ym)).map(l => loanAt(l, ym)));
   const lis = lisAt(f, ym).used;
   const entries = entriesAt(f, ym);
   const variable = sum([variableSpendTotal(ym), ...entries.filter(e => e.type === 'expense').map(e => e.amount)]);
-  return { bills, cards, loans, lis, variable, total: sum([bills, cards, loans, lis, variable]) };
+  return { bills, cards, loans, payrollLoans, lis, variable, total: sum([bills, cards, loans, lis, variable]) };
 }
 
 export function monthPercent(ym = monthKey()) {
@@ -753,13 +767,56 @@ export function financialSummary(ym = financeMonth) {
   const amount = (type, status) => sum(entries.filter(e => e.type === type && (!status || e.status === status)).map(e => e.amount));
   const income = amount('income');
   const received = amount('income', 'confirmed');
-  const invested = amount('investment');
+  const invested = sum([amount('investment'), ...entries.filter(e => e.type === 'valuation' && e.cashContribution).map(e => e.amount)]);
   const redeemed = amount('redemption');
   const expenses = monthCommitted(ym).total;
+  const unreconciledBalance = sum([income, redeemed, -expenses, -invested]);
+  const reconciliationAdjustment = state.finance.cashReconciliations[ym]?.adjustment || 0;
   return { income, received, invested, redeemed, expenses,
-    balance: sum([income, redeemed, -expenses, -invested]),
+    unreconciledBalance, reconciliationAdjustment,
+    balance: sum([unreconciledBalance, reconciliationAdjustment]),
     assets: sum(investmentPortfolio(ym).map(a => a.balance)),
     projectedAssets: sum(projectedInvestmentPortfolio(ym).map(a => a.balance)) };
+}
+export function reconcileInitialMonth({ accountBalance, includeValuationsAsContributions = false, payrollLoanIds = [] }, ym = financeMonth) {
+  if (ym !== financeMonth || ym > monthKey() || !Number.isFinite(accountBalance) || accountBalance < 0 ||
+      payrollLoanIds.some(id => !state.finance.loans.some(l => l.id === id))) throw new Error('Informe o saldo real e um mês atual ou anterior.');
+  const entries = financeEntries(ym);
+  const snapshots = new Map();
+  if (includeValuationsAsContributions) {
+    const priorAssets = investmentPortfolio(addMonths(ym,-1));
+    entries.filter(e => e.type === 'valuation' && e.status === 'confirmed' && !e.recurring)
+      .sort((a,b) => a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt))
+      .forEach(e => snapshots.set(e.asset, e));
+    for (const [asset] of snapshots) {
+      if (priorAssets.some(a => a.name === asset && a.balance !== 0) ||
+          entries.some(e => e.asset === asset && ['investment','redemption','yield'].includes(e.type))) {
+        throw new Error('Esta aplicação já tem histórico ou movimentos no mês. Corrija seus aportes em Lançamentos para evitar duplicidade.');
+      }
+    }
+  }
+  // O saldo continua sendo uma posição da carteira. O marcador reconhece o
+  // dinheiro guardado neste mês sem somá-lo novamente ao patrimônio.
+  for (const e of entries.filter(e => e.type === 'valuation')) {
+    const key = `${e.id}:${ym}`;
+    state.finance.entryOverrides[key] = { ...state.finance.entryOverrides[key], cashContribution: snapshots.get(e.asset)?.id === e.id };
+  }
+  for (const loan of state.finance.loans) {
+    loan.salaryDeductionHistory ||= [];
+    loan.salaryDeductionHistory = loan.salaryDeductionHistory.filter(v => v.month !== ym);
+    loan.salaryDeductionHistory.push({ month: ym, value: payrollLoanIds.includes(loan.id) });
+  }
+  const before = financialSummary(ym).unreconciledBalance;
+  state.finance.cashReconciliations[ym] = {
+    accountBalance: Math.round(accountBalance * 100) / 100,
+    adjustment: sum([accountBalance, -before]),
+    recordedAt: new Date().toISOString(),
+  };
+  save();
+}
+export function clearCashReconciliation(ym = financeMonth) {
+  delete state.finance.cashReconciliations[ym];
+  save();
 }
 export function addFinanceEntry(entry) {
   if (!Number.isFinite(Number(entry.amount)) || Number(entry.amount) < 0 ||

@@ -18,6 +18,7 @@ export function normalizeFinance(state, currentMonth) {
   f.cardInvoices ||= {};
   f.entryOverrides ||= {};
   f.budgets ||= {};
+  f.cashReconciliations ||= {};
   f.budgetBaseline ??= state.profile.budgetMensal;
   f.lisHistory ||= { [currentMonth]: { ...f.lis } };
   f.fixedBills.forEach(b => { b.startMonth ||= '1900-01'; b.versions ||= []; });

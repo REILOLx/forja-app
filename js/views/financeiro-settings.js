@@ -1,6 +1,6 @@
 import { icon } from '../icons.js';
 import {
-  monthPercent, cardInvoiceForMonth, activeLoanBalance, formatMoney, selectedFinanceMonth, fixedBillsForMonth, lisForMonth, loanAmountForMonth,
+  loanDeductedFromNetSalary, monthPercent, cardInvoiceForMonth, activeLoanBalance, formatMoney, selectedFinanceMonth, fixedBillsForMonth, lisForMonth, loanAmountForMonth,
 } from '../store.js';
 
 let editingBudget = false;
@@ -96,7 +96,7 @@ export function render(state) {
                 <span class="fjc" style="font-size:13px;font-weight:700;color:var(--ember);">${pctLoan}%</span>
               </div>
               <div class="progress-track thin" style="margin-bottom:6px;"><div class="progress-fill" style="width:${pctLoan}%;"></div></div>
-              <div class="muted" style="font-size:11.5px;">Faltam ${activeLoanBalance(l)} de ${l.installments} parcelas · ${formatMoney(l.monthlyAmount)}/mês</div>
+              <div class="muted" style="font-size:11.5px;">Faltam ${activeLoanBalance(l)} de ${l.installments} parcelas · ${formatMoney(l.monthlyAmount)}/mês${loanDeductedFromNetSalary(l,ym)?' · já descontado do salário líquido':''}</div>
             </div>`;
         }).join('') || '<div class="muted" style="font-size:13px;">Nenhum empréstimo em aberto.</div>'}
       </div>

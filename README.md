@@ -22,6 +22,8 @@ em `js/supabase-client.js` e a tabela Supabase `app_state` já utilizada pelo ap
 - Investimentos aceitam saldo inicial/atual, aporte, resgate e rendimento. Só registros confirmados compõem o patrimônio; saldos não movimentam caixa. Não há conexão automática com bancos.
 - O patrimônio previsto acumula os investimentos confirmados e os movimentos previstos até o mês selecionado. Ex.: R$ 2.080 em novembro + aporte previsto de R$ 1.000 em dezembro = R$ 3.080 previstos; dezembro registra só R$ 1.000 de aporte e nenhum gasto por esse investimento. Previsões podem ser editadas ou excluídas em Lançamentos.
 - Em Investimentos, Aporte soma dinheiro novo; Saldo total substitui a posição anterior e não representa um aporte. Em Lançamentos, é possível corrigir o tipo e a aplicação de um registro já feito. Não são reclassificados registros antigos automaticamente.
+- Em **Conciliar mês inicial**, informe o saldo real da conta e identifique aplicações formadas neste mês e empréstimos já descontados do salário líquido. O patrimônio não é somado novamente. A diferença inicial é registrada como conciliação, fora de receitas, despesas e teto, e não se repete em meses seguintes. Novos lançamentos continuam alterando o saldo previsto.
+- Empréstimos já descontados do salário líquido permanecem no controle da dívida, sem novo débito no caixa ou no teto. A opção vale a partir do mês selecionado e pode ser alterada na edição do contrato.
 - O gráfico compara seis meses; os trechos futuros são pontilhados. A comparação inclui obrigações previstas, não apenas pagamentos confirmados.
 - O LIS é provisionado integralmente a partir do primeiro registro até uma nova atualização, sem estimar juros.
 

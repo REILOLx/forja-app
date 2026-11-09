@@ -144,6 +144,57 @@ test('projeção respeita saldo substitutivo, resgates, rendimentos e alteraçõ
  store.updateFinanceOccurrence(investment.id,'2026-12',{asset:'Outra aplicação'});
  assert.equal(store.projectedInvestmentPortfolio('2026-12').find(a=>a.name==='Outra aplicação').balance,1000);
 });
+test('concilia o mês inicial com salário líquido, conta zerada e investimento preservado',()=>{
+ clean();const f=store.getState().finance;
+ f.fixedBills=[{id:'contas',name:'Contas',amount:1801.43,startMonth:'2026-11',versions:[]}];
+ f.cards=[];f.loans=[{id:'consignado',name:'Crédito do trabalhador',startMonth:'2026-11',installments:45,paidInstallments:0,monthlyAmount:1349.56}];f.lisHistory={};
+ store.addFinanceEntry({type:'income',amount:4000,date:'2026-11-01',status:'confirmed',recurring:true});
+ store.addFinanceEntry({type:'valuation',amount:2080.67,date:'2026-11-09',asset:'Reserva',status:'confirmed',recurring:false});
+ assert.equal(store.financialSummary('2026-11').balance,849.01);
+ const config={accountBalance:0,includeValuationsAsContributions:true,payrollLoanIds:['consignado']};
+ store.reconcileInitialMonth(config);
+ let summary=store.financialSummary('2026-11');
+ assert.equal(summary.balance,0);assert.equal(summary.expenses,1801.43);
+ assert.equal(summary.invested,2080.67);assert.equal(summary.assets,2080.67);
+ assert.equal(summary.projectedAssets,2080.67);assert.equal(summary.reconciliationAdjustment,-117.9);
+ assert.equal(store.monthlyAnalysis('2026-11').headroom,1398.57);
+ assert.equal(store.monthCommitted('2026-11').payrollLoans,1349.56);
+ assert.equal(store.loanAmountForMonth(f.loans[0],'2026-11'),1349.56);
+ assert.equal(f.loans[0].paidInstallments,0);
+ store.reconcileInitialMonth(config);
+ assert.equal(store.financialSummary('2026-11').balance,0);
+ assert.equal(store.financialSummary('2026-11').assets,2080.67);
+ store.addFinanceEntry({type:'investment',amount:1000,date:'2026-12-01',asset:'Reserva',status:'planned',recurring:false});
+ const next=store.financialSummary('2026-12');
+ assert.equal(next.invested,1000);assert.equal(next.projectedAssets,3080.67);
+ assert.equal(next.reconciliationAdjustment,0);assert.equal(next.balance,1198.57);
+ store.addFinanceEntry({type:'expense',amount:10,date:'2026-11-09',status:'confirmed',recurring:false});
+ assert.equal(store.financialSummary('2026-11').balance,-10);
+ const backup=store.exportData();store.importData(backup);assert.equal(store.exportData(),backup);
+ store.clearCashReconciliation('2026-11');assert.equal(store.financialSummary('2026-11').balance,107.9);
+});
+test('desconto em folha preserva meses anteriores e pode encerrar sem alterar contrato',()=>{
+ clean();const loan=store.getState().finance.loans[0],before=store.monthCommitted('2026-11').loans;
+ store.updateLoan(loan.id,{includedInNetSalary:true});
+ assert.equal(store.loanDeductedFromNetSalary(loan,'2026-10'),false);
+ assert.equal(store.loanDeductedFromNetSalary(loan,'2026-11'),true);
+ assert.equal(store.monthCommitted('2026-11').loans,before-loan.monthlyAmount);
+ store.selectFinanceMonth('2026-12');store.updateLoan(loan.id,{includedInNetSalary:false});
+ assert.equal(store.loanDeductedFromNetSalary(loan,'2026-11'),true);
+ assert.equal(store.loanDeductedFromNetSalary(loan,'2026-12'),false);
+});
+test('conciliação impede duplicar aporte e saldo ou atribuir patrimônio antigo ao mês atual',()=>{
+ clean();store.addFinanceEntry({type:'valuation',amount:2000,date:'2026-10-01',asset:'Reserva',status:'confirmed',recurring:false});
+ store.addFinanceEntry({type:'valuation',amount:2080,date:'2026-11-01',asset:'Reserva',status:'confirmed',recurring:false});
+ const before=store.exportData();
+ assert.throws(()=>store.reconcileInitialMonth({accountBalance:0,includeValuationsAsContributions:true}));
+ assert.equal(store.exportData(),before);
+ assert.throws(()=>store.reconcileInitialMonth({accountBalance:NaN}));
+ assert.throws(()=>store.reconcileInitialMonth({accountBalance:0,payrollLoanIds:['inexistente']}));
+ clean();store.addFinanceEntry({type:'investment',amount:100,date:'2026-11-01',asset:'Reserva',status:'confirmed',recurring:false});
+ store.addFinanceEntry({type:'valuation',amount:100,date:'2026-11-02',asset:'Reserva',status:'confirmed',recurring:false});
+ assert.throws(()=>store.reconcileInitialMonth({accountBalance:0,includeValuationsAsContributions:true}));
+});
 
 test('teto de gastos é 80% das receitas do próprio mês, incluindo 13º',()=>{
  clean();store.addFinanceEntry({type:'income',amount:5000,date:'2026-11-05',status:'planned',description:'Salário',recurring:true});
