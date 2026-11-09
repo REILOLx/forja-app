@@ -747,6 +747,7 @@ export function loanAmountForMonth(l, ym = financeMonth) { return loanAt(l, ym);
 export function lisForMonth(ym = financeMonth) { return lisAt(state.finance, ym); }
 export function financeEntries(ym = financeMonth) { return entriesAt(state.finance, ym); }
 export function investmentPortfolio(ym = financeMonth, throughDate) { return portfolioAt(state.finance, ym, throughDate); }
+export function projectedInvestmentPortfolio(ym = financeMonth) { return portfolioAt(state.finance, ym, undefined, { includePlanned: true }); }
 export function financialSummary(ym = financeMonth) {
   const entries = financeEntries(ym);
   const amount = (type, status) => sum(entries.filter(e => e.type === type && (!status || e.status === status)).map(e => e.amount));
@@ -757,7 +758,8 @@ export function financialSummary(ym = financeMonth) {
   const expenses = monthCommitted(ym).total;
   return { income, received, invested, redeemed, expenses,
     balance: sum([income, redeemed, -expenses, -invested]),
-    assets: sum(investmentPortfolio(ym).map(a => a.balance)) };
+    assets: sum(investmentPortfolio(ym).map(a => a.balance)),
+    projectedAssets: sum(projectedInvestmentPortfolio(ym).map(a => a.balance)) };
 }
 export function addFinanceEntry(entry) {
   if (!Number.isFinite(Number(entry.amount)) || Number(entry.amount) < 0 ||

@@ -22,7 +22,7 @@ export function render(state) {
       <div class="hero-foot"><span>${store.formatMoney(summary.received)} em receitas confirmadas</span><span>·</span><span>${store.formatMoney(summary.income - summary.received)} a receber</span></div>
     </section>
     <div class="metric-grid">
-      ${metric('Receitas previstas', summary.income, 'positive')}${metric('Despesas previstas', summary.expenses)}${metric('Investimentos do mês', summary.invested, 'positive')}${metric('Patrimônio registrado', summary.assets, 'positive')}
+      ${metric('Receitas previstas', summary.income, 'positive')}${metric('Despesas previstas', summary.expenses)}${metric('Investimentos do mês', summary.invested, 'positive')}${metric('Patrimônio previsto acumulado', summary.projectedAssets, 'positive')}
     </div>
     <div class="quick-actions">
       <a href="#/financeiro/receita" class="card quick-action">${icon.plus()}<span>Nova receita</span></a>
@@ -51,7 +51,7 @@ export function render(state) {
         </div>
       </div>
       <section class="finance-section"><div><h2>No seu horizonte</h2><p class="page-description">Próximos 3 meses · com os compromissos já cadastrados.</p></div>
-      <div class="forecast-grid">${[1,2,3].map(n=>{const m=store.addMonths(ym,n),s=store.financialSummary(m);return `<button class="card forecast" data-forecast-month="${m}"><small>${monthLabel(m,true)}</small><strong class="${s.balance<0?'negative':'positive'}">${store.formatMoney(s.balance)}</strong><p>Entradas ${store.formatMoney(s.income+s.redeemed)}<br>Despesas ${store.formatMoney(s.expenses)}<br>Investimentos ${store.formatMoney(s.invested)}</p></button>`;}).join('')}</div>
+      <div class="forecast-grid">${[1,2,3].map(n=>{const m=store.addMonths(ym,n),s=store.financialSummary(m);return `<button class="card forecast" data-forecast-month="${m}"><small>${monthLabel(m,true)}</small><strong class="${s.balance<0?'negative':'positive'}">${store.formatMoney(s.balance)}</strong><p>Entradas ${store.formatMoney(s.income+s.redeemed)}<br>Despesas ${store.formatMoney(s.expenses)}<br>Aporte do mês ${store.formatMoney(s.invested)}<br>Patrimônio previsto ${store.formatMoney(s.projectedAssets)}</p></button>`;}).join('')}</div>
       <p class="hint">Projeção baseada em recorrências, parcelas e lançamentos previstos. Não estima juros, rentabilidade ou despesas ainda não registradas. O limite especial é provisionado integralmente até ser atualizado.</p></section>
     `}</div>`;
 }
@@ -73,7 +73,7 @@ function ledger(state,ym) {
         <button class="btn-link" data-entry-delete="${e.id}" data-source="${e.source}">Excluir este mês</button>
         ${e.recurring?`<button class="btn-link" data-entry-end="${e.id}">Encerrar repetição</button>`:''}
       </div>
-      ${editingEntry===e.id?`<form data-edit-entry-form="${e.id}" class="stack gap-8" style="margin-top:12px"><label class="field">Descrição<input name="description" value="${esc(e.description)}" required maxlength="120"></label><label class="field">Valor (R$)<input name="amount" type="number" min="${e.type==='valuation'?'0':'0.01'}" step="0.01" value="${e.amount}" required></label><p class="hint">Altera somente a ocorrência deste mês.</p><button class="btn btn-primary">Salvar alteração</button></form>`:''}
+      ${editingEntry===e.id?`<form data-edit-entry-form="${e.id}" class="stack gap-8" style="margin-top:12px"><label class="field">Tipo de lançamento<select name="type">${Object.entries(TYPES).map(([type,label])=>`<option value="${type}" ${type===e.type?'selected':''}>${label}</option>`).join('')}</select></label><label class="field">Aplicação (para investimentos)<input name="asset" value="${esc(e.asset||'')}" maxlength="80"></label><label class="field">Descrição<input name="description" value="${esc(e.description)}" required maxlength="120"></label><label class="field">Valor (R$)<input name="amount" type="number" min="0" step="0.01" value="${e.amount}" required></label><p class="hint">Altera somente a ocorrência deste mês. Aporte é dinheiro novo guardado; saldo atualizado substitui o total da aplicação. Para corrigir uma despesa que era investimento, selecione Investimento · aporte.</p><button class="btn btn-primary">Salvar alteração</button></form>`:''}
     </div><span class="amount ${['income','redemption','yield'].includes(e.type)?'positive':''}">${store.formatMoney(e.amount)}</span></div>`).join('')}</div>` : '<div class="empty-state"><strong>Um mês para organizar</strong><p>Nenhum lançamento neste filtro. Use os atalhos acima para começar.</p></div>'}`;
 }
 export function afterRender(container, {render}) {
@@ -85,11 +85,18 @@ export function afterRender(container, {render}) {
   const ym=store.selectedFinanceMonth();
   container.querySelectorAll('[data-entry-toggle]').forEach(el=>el.addEventListener('click',()=>{
     const e=store.financeEntries(ym).find(e=>e.id===el.dataset.entryToggle);
-    if(e.status!=='confirmed' && ym>store.monthKey()) {toast('Mantenha os movimentos futuros como previstos.');return;}
+    if(e.status!=='confirmed' && e.date>store.todayISO()) {toast('Mantenha os movimentos futuros como previstos.');return;}
     store.updateFinanceOccurrence(e.id,ym,{status:e.status==='confirmed'?'planned':'confirmed'});render();toast('Situação atualizada.');
   }));
   container.querySelectorAll('[data-entry-edit]').forEach(el=>el.addEventListener('click',()=>{editingEntry=editingEntry===el.dataset.entryEdit?null:el.dataset.entryEdit;render();}));
-  container.querySelectorAll('[data-edit-entry-form]').forEach(form=>form.addEventListener('submit',ev=>{ev.preventDefault();store.updateFinanceOccurrence(form.dataset.editEntryForm,ym,{description:form.elements.description.value.trim(),amount:Number(form.elements.amount.value)});editingEntry=null;render();toast('Lançamento atualizado.');}));
+  container.querySelectorAll('[data-edit-entry-form]').forEach(form=>form.addEventListener('submit',ev=>{
+    ev.preventDefault();const type=form.elements.type.value,asset=form.elements.asset.value.trim(),amount=Number(form.elements.amount.value);
+    if(!Number.isFinite(amount)||amount<0||(amount===0&&type!=='valuation')){toast('Informe um valor válido.');return;}
+    if(['investment','redemption','yield','valuation'].includes(type)&&!asset){toast('Informe a aplicação deste investimento.');return;}
+    const entry=store.financeEntries(ym).find(e=>e.id===form.dataset.editEntryForm);
+    if(entry.recurring&&['investment','redemption','yield','valuation'].includes(type)){toast('Encerre a repetição e registre o aporte na tela Investimentos.');return;}
+    store.updateFinanceOccurrence(entry.id,ym,{type,asset,description:form.elements.description.value.trim(),amount});editingEntry=null;render();toast('Lançamento atualizado.');
+  }));
   container.querySelectorAll('[data-entry-delete]').forEach(el=>el.addEventListener('click',()=>{
     if(!window.confirm('Excluir este lançamento do mês selecionado?'))return;
     if(el.dataset.source==='legacy')store.removeVariableExpense(el.dataset.entryDelete,ym);else store.updateFinanceOccurrence(el.dataset.entryDelete,ym,{deleted:true});render();toast('Lançamento excluído.');

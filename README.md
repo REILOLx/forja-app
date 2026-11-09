@@ -20,6 +20,8 @@ em `js/supabase-client.js` e a tabela Supabase `app_state` já utilizada pelo ap
 - Contas fixas e orçamento legado são versionados a partir do mês selecionado. Os valores anteriores são preservados.
 - O resumo e as projeções exibem despesas e investimentos separadamente. O disponível na conta desconta os aportes por serem transferências para a carteira, sem incluí-los nos gastos ou no teto de 80%.
 - Investimentos aceitam saldo inicial/atual, aporte, resgate e rendimento. Só registros confirmados compõem o patrimônio; saldos não movimentam caixa. Não há conexão automática com bancos.
+- O patrimônio previsto acumula os investimentos confirmados e os movimentos previstos até o mês selecionado. Ex.: R$ 2.080 em novembro + aporte previsto de R$ 1.000 em dezembro = R$ 3.080 previstos; dezembro registra só R$ 1.000 de aporte e nenhum gasto por esse investimento. Previsões podem ser editadas ou excluídas em Lançamentos.
+- Em Investimentos, Aporte soma dinheiro novo; Saldo total substitui a posição anterior e não representa um aporte. Em Lançamentos, é possível corrigir o tipo e a aplicação de um registro já feito. Não são reclassificados registros antigos automaticamente.
 - O gráfico compara seis meses; os trechos futuros são pontilhados. A comparação inclui obrigações previstas, não apenas pagamentos confirmados.
 - O LIS é provisionado integralmente a partir do primeiro registro até uma nova atualização, sem estimar juros.
 

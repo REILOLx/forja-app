@@ -97,6 +97,54 @@ test('datas locais e virada de ano',()=>{
  assert.equal(store.addMonths('2026-12',1),'2027-01');
 });
 
+test('novembro zerado com investimento e dezembro acumula somente o novo aporte previsto',()=>{
+ clean();const f=store.getState().finance;
+ f.fixedBills=[];f.cards=[];f.loans=[];f.lisHistory={};
+ const add=(type,amount,date,status='confirmed')=>store.addFinanceEntry({type,amount,date,status,asset:'Reserva',category:'Renda fixa',recurring:false});
+ add('income',4000,'2026-11-01');add('expense',1920,'2026-11-02');add('investment',2080,'2026-11-03');
+ add('investment',1000,'2026-12-01','planned');
+ const november=store.monthlyAnalysis('2026-11'),december=store.financialSummary('2026-12');
+ assert.equal(november.balance,0);assert.equal(november.expenses,1920);assert.equal(november.headroom,1280);
+ assert.equal(november.invested,2080);assert.equal(november.projectedAssets,2080);
+ assert.equal(december.invested,1000);assert.equal(december.expenses,0);
+ assert.equal(december.assets,2080);assert.equal(december.projectedAssets,3080);
+ assert.equal(store.financialSummary('2027-01').projectedAssets,3080);
+ const planned=store.financeEntries('2026-12')[0];
+ store.updateFinanceOccurrence(planned.id,'2026-12',{amount:1200});
+ assert.equal(store.financialSummary('2026-12').projectedAssets,3280);
+ assert.equal(store.financialSummary('2026-11').projectedAssets,2080);
+ store.updateFinanceOccurrence(planned.id,'2026-12',{status:'confirmed'});
+ assert.equal(store.financialSummary('2026-12').assets,3280);
+ assert.equal(store.financialSummary('2026-12').projectedAssets,3280);
+ store.updateFinanceOccurrence(planned.id,'2026-12',{deleted:true});
+ assert.equal(store.financialSummary('2026-12').projectedAssets,2080);
+});
+test('corrigir despesa para aporte remove o gasto e inclui patrimônio sem descontar caixa duas vezes',()=>{
+ clean();store.addFinanceEntry({type:'expense',amount:2080.67,date:'2026-11-03',status:'confirmed',recurring:false});
+ const entry=store.financeEntries('2026-11')[0],before=store.financialSummary('2026-11');
+ store.updateFinanceOccurrence(entry.id,'2026-11',{type:'investment',asset:'Reserva'});
+ const after=store.financialSummary('2026-11');
+ assert.equal(after.expenses,Math.round((before.expenses-2080.67)*100)/100);
+ assert.equal(after.balance,before.balance);assert.equal(after.assets,2080.67);
+ store.updateFinanceOccurrence(entry.id,'2026-11',{type:'valuation'});
+ assert.equal(store.financialSummary('2026-11').assets,2080.67);
+ assert.equal(store.financialSummary('2026-11').invested,0);
+});
+test('projeção respeita saldo substitutivo, resgates, rendimentos e alterações de aplicação',()=>{
+ clean();const add=(type,amount,date,status)=>store.addFinanceEntry({type,amount,date,status,asset:'Reserva',recurring:false});
+ add('valuation',2080,'2026-11-01','confirmed');
+ add('investment',1000,'2026-12-01','planned');
+ add('redemption',80,'2026-12-02','planned');
+ add('yield',10,'2026-12-03','planned');
+ assert.equal(store.financialSummary('2026-12').projectedAssets,3010);
+ add('valuation',3500,'2026-12-04','planned');
+ assert.equal(store.financialSummary('2026-12').projectedAssets,3500);
+ assert.equal(store.financialSummary('2026-12').assets,2080);
+ const investment=store.financeEntries('2026-12').find(e=>e.type==='investment');
+ store.updateFinanceOccurrence(investment.id,'2026-12',{asset:'Outra aplicação'});
+ assert.equal(store.projectedInvestmentPortfolio('2026-12').find(a=>a.name==='Outra aplicação').balance,1000);
+});
+
 test('teto de gastos é 80% das receitas do próprio mês, incluindo 13º',()=>{
  clean();store.addFinanceEntry({type:'income',amount:5000,date:'2026-11-05',status:'planned',description:'Salário',recurring:true});
  store.addFinanceEntry({type:'income',amount:2000,date:'2026-12-20',status:'planned',description:'13º',recurring:false});

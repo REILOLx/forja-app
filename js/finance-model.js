@@ -66,14 +66,15 @@ export function budgetAt(state, ym) {
   const key = Object.keys(state.finance.budgets).filter(k => k <= ym).sort().pop();
   return key ? state.finance.budgets[key] : state.finance.budgetBaseline;
 }
-export function portfolioAt(f, ym, throughDate) {
+export function portfolioAt(f, ym, throughDate, { includePlanned = false } = {}) {
   const assets = new Map();
   const end = throughDate || `${ym}-31`;
-  f.entries.filter(e => e.date <= end && !e.recurring && ['investment','redemption','yield','valuation'].includes(e.type))
+  f.entries.map(e => ({ ...e, ...(f.entryOverrides[`${e.id}:${e.date.slice(0,7)}`] || {}) }))
+    .filter(e => e.date <= end && !e.recurring && ['investment','redemption','yield','valuation'].includes(e.type))
     .sort((a,b) => a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt))
     .forEach(e => {
-      const item = { ...e, ...(f.entryOverrides[`${e.id}:${e.date.slice(0,7)}`] || {}) };
-      if (item.status !== 'confirmed' || item.deleted) return;
+      const item = e;
+      if (!(item.status === 'confirmed' || (includePlanned && item.status === 'planned')) || item.deleted) return;
       const asset = assets.get(e.asset) || { name: e.asset, balance: 0, category: e.category };
       asset.balance = money(e.type === 'valuation' ? item.amount : asset.balance + (e.type === 'redemption' ? -item.amount : item.amount));
       assets.set(e.asset, asset);

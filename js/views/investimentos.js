@@ -3,27 +3,30 @@ import * as store from '../store.js';
 import { escapeHTML as esc, financeHeading, monthPicker, bindMonthPicker, defaultFinanceDate, toast } from '../ui.js';
 export function render(state) {
   const ym=store.selectedFinanceMonth();
-  const portfolio=store.investmentPortfolio(ym);
+  const portfolio=store.projectedInvestmentPortfolio(ym);
+  const confirmed=store.investmentPortfolio(ym);
   const summary=store.financialSummary(ym);
-  const total=summary.assets;
+  const total=summary.projectedAssets;
   const names=[...new Set(state.finance.entries.filter(e=>e.asset).map(e=>e.asset))];
   return `${financeHeading('Investimentos','Seu patrimônio, com registros simples e sob seu controle.')}${monthPicker()}
-    <section class="hero-balance"><div class="section-label" style="color:var(--ember)">Patrimônio registrado até o mês</div><div class="hero-amount">${store.formatMoney(total)}</div><p class="hint">Soma dos saldos confirmados. Atualize os valores para refletir sua carteira.</p></section>
+    <section class="hero-balance"><div class="section-label" style="color:var(--ember)">Patrimônio previsto até o mês</div><div class="hero-amount">${store.formatMoney(total)}</div><p class="hint">Saldo acumulado dos meses anteriores + aportes − resgates + rendimentos, incluindo o que você planejou. Um novo aporte soma apenas o valor novo, sem repetir o saldo anterior.</p></section>
     <div class="metric-grid">
+      <div class="metric"><span>Patrimônio confirmado</span><strong class="positive">${store.formatMoney(summary.assets)}</strong></div>
+      <div class="metric"><span>Patrimônio previsto</span><strong class="positive">${store.formatMoney(summary.projectedAssets)}</strong></div>
       <div class="metric"><span>Investimentos do mês · aportes</span><strong class="positive">${store.formatMoney(summary.invested)}</strong></div>
       <div class="metric"><span>Resgates do mês</span><strong>${store.formatMoney(summary.redeemed)}</strong></div>
     </div>
-    <p class="hint">Aportes são investimentos, não gastos: ficam fora das despesas e do teto de 80%. Transferem dinheiro da conta para a carteira. Os valores do mês incluem movimentos previstos; apenas os confirmados entram no patrimônio.</p>
+    <p class="hint">Aportes são investimentos, não gastos: ficam fora das despesas e do teto de 80%. Transferem dinheiro da conta para a carteira. Os valores do mês incluem movimentos previstos; apenas os confirmados entram no patrimônio confirmado.</p>
     <div class="finance-columns"><section class="card finance-section"><h2>Sua carteira</h2>
-    ${portfolio.length?portfolio.map(a=>`<div class="finance-row"><span><strong>${esc(a.name)}</strong><small>${esc(a.category)}</small></span><span class="amount">${store.formatMoney(a.balance)}</span></div>`).join(''):'<div class="empty-state"><strong>Seu patrimônio começa aqui</strong><p>Registre o saldo que já possui e acompanhe os próximos aportes.</p></div>'}
+    ${portfolio.length?portfolio.map(a=>`<div class="finance-row"><span><strong>${esc(a.name)}</strong><small>${esc(a.category)} · confirmado ${store.formatMoney(confirmed.find(c=>c.name===a.name)?.balance||0)}</small></span><span class="amount">${store.formatMoney(a.balance)}<small>previsto acumulado</small></span></div>`).join(''):'<div class="empty-state"><strong>Seu patrimônio começa aqui</strong><p>Registre o saldo que já possui e acompanhe os próximos aportes.</p></div>'}
     <p class="hint">Não há conexão automática com bancos ou corretoras. Rendimentos são registros de valorização na carteira; se forem pagos na sua conta, registre também o resgate correspondente.</p>
     <a href="#/financeiro" class="btn-ghost" style="text-align:center">Ver lançamentos do mês</a></section>
-    <form id="investment-form" class="card stack" style="gap:18px"><h2>Registrar movimento</h2>
-      <label class="field">Movimento<select name="type" id="investment-type"><option value="valuation">Informar saldo atual</option><option value="investment">Investimento · aporte na carteira</option><option value="redemption">Resgate · entra na conta</option><option value="yield">Rendimento · fica investido</option></select><span class="hint" id="investment-hint">Define o saldo da aplicação nesta data, sem movimentar o caixa. Use para cadastrar sua posição inicial ou atualizar a cotação.</span></label>
+    <form id="investment-form" class="card stack" style="gap:18px"><h2>Registrar movimento</h2><p class="hint">Aporte soma apenas o dinheiro novo guardado no mês. Saldo total substitui a posição anterior. Corrija registros existentes em Financeiro → Lançamentos → Editar para evitar duplicidade.</p>
+      <label class="field">Movimento<select name="type" id="investment-type"><option value="investment">Aporte · valor novo investido no mês</option><option value="valuation">Saldo total · substitui o saldo anterior</option><option value="redemption">Resgate · entra na conta</option><option value="yield">Rendimento · fica investido</option></select><span class="hint" id="investment-hint">Informe apenas quanto vai adicionar neste mês. Ex.: R$ 2.080 já investidos + aporte previsto de R$ 1.000 = patrimônio previsto de R$ 3.080. Aporte não é gasto.</span></label>
       <label class="field">Nome da aplicação<input name="asset" list="asset-names" placeholder="Ex.: Reserva de emergência" maxlength="80" required><datalist id="asset-names">${names.map(n=>`<option value="${esc(n)}">`).join('')}</datalist></label>
       <label class="field">Categoria<select name="category"><option>Renda fixa</option><option>Tesouro Direto</option><option>Fundos</option><option>Ações</option><option>Fundos imobiliários</option><option>Previdência</option><option>Outros</option></select></label>
-      <div class="form-grid"><label class="field">Valor (R$)<input name="amount" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0,00" required></label><label class="field">Data<input name="date" type="date" value="${defaultFinanceDate()}" required></label></div>
-      <label class="field">Situação<select name="status"><option value="confirmed">Confirmado</option><option value="planned">Previsto</option></select><span class="hint">Apenas movimentos confirmados compõem o patrimônio. Aportes e resgates previstos entram na projeção mensal.</span></label>
+      <div class="form-grid"><label class="field">Valor (R$)<input name="amount" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="0,00" required></label><label class="field">Data<input name="date" type="date" value="${defaultFinanceDate()}" required></label></div>
+      <label class="field">Situação<select name="status"><option value="confirmed">Confirmado</option><option value="planned">Previsto</option></select><span class="hint">Apenas movimentos confirmados compõem o patrimônio. Movimentos previstos entram no patrimônio projetado, sem alterar o patrimônio confirmado. Você pode ajustar ou excluir a previsão em Lançamentos.</span></label>
       <p class="form-error" id="investment-error" role="alert"></p><button class="btn btn-primary">Salvar movimento</button>
     </form></div>`;
 }
@@ -32,7 +35,8 @@ export function afterRender(container,{render}) {
   const form=container.querySelector('#investment-form');
   const hints={valuation:'Define o saldo da aplicação nesta data, sem movimentar o caixa. Use para cadastrar sua posição inicial ou atualizar a cotação.',investment:'Transfere dinheiro da conta para a carteira, sem contar como gasto. Reduz o disponível na conta e aumenta o patrimônio quando confirmado.',redemption:'Aumenta o saldo previsto da conta e reduz o patrimônio quando confirmado.',yield:'Aumenta o patrimônio, sem somar uma entrada na conta.'};
   form.elements.type.addEventListener('change',()=>{container.querySelector('#investment-hint').textContent=hints[form.elements.type.value];form.elements.amount.min=form.elements.type.value==='valuation'?'0':'0.01';});
-  if(store.selectedFinanceMonth()>store.monthKey()) form.elements.status.value='planned';
+  const updateStatus=()=>{const future=form.elements.date.value>store.todayISO();form.elements.status.options[0].disabled=future;if(future)form.elements.status.value='planned';};
+  form.elements.date.addEventListener('change',updateStatus);updateStatus();
   form.addEventListener('submit',ev=>{
     ev.preventDefault();const d=Object.fromEntries(new FormData(form));
     try {

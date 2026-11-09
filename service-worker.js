@@ -1,4 +1,4 @@
-const CACHE_NAME = 'forja-cache-v10';
+const CACHE_NAME = 'forja-cache-v11';
 const ASSETS = [
   './',
   './index.html',
