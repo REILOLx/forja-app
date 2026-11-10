@@ -326,3 +326,47 @@ test('tendência usa despesas do mês anterior e inclui fatura informada',()=>{
  assert.equal(analysis.change,Math.round((store.financialSummary('2026-11').expenses-store.financialSummary('2026-10').expenses)*100)/100);
  assert.equal(store.monthlyAnalysis('2026-10').spendingRatio,null);
 });
+
+test('detalhamento lista cada despesa e fecha o mesmo total do resumo em centavos',()=>{
+ clean();const f=store.getState().finance;
+ f.fixedBills=[{id:'casa',name:'Casa',amount:100.01,dueDay:5,startMonth:'2026-11',versions:[]}];
+ f.cards=[{id:'cartao',name:'Cartão',dueDay:10}];f.cardCharges=[{id:'compra',cardId:'cartao',desc:'Compra',totalAmount:100,installments:3,startMonth:'2026-11'}];
+ f.loans=[{id:'normal',name:'Empréstimo',bank:'Banco',monthlyAmount:200.02,installments:3,startMonth:'2026-11',paidInstallments:0},{id:'folha',name:'Desconto em folha',monthlyAmount:300,installments:3,startMonth:'2026-11',paidInstallments:0,salaryDeductionHistory:[{month:'2026-11',value:true}]}];
+ f.lisHistory={'2026-11':{used:10.03,limit:100}};f.variableSpend={'2026-11':[{id:'antigo',desc:'Mercado',amount:20.04,date:'2026-11-02'}]};
+ store.addFinanceEntry({type:'expense',description:'Cinema',amount:30.05,date:'2026-11-03',status:'confirmed'});
+ store.addFinanceEntry({type:'expense',description:'Prevista',amount:40.06,date:'2026-11-25',status:'planned'});
+ store.addFinanceEntry({type:'investment',description:'Aporte',asset:'Reserva',amount:500,date:'2026-11-05',status:'confirmed'});
+ const before=store.exportData(),details=store.expenseBreakdown('2026-11'),items=details.groups.flatMap(g=>g.items);
+ assert.equal(details.total,433.55);assert.equal(details.total,store.financialSummary('2026-11').expenses);assert.equal(details.total,store.monthCommitted('2026-11').total);
+ assert.equal(items.reduce((total,it)=>total+Math.round(it.amount*100),0)/100,details.total);
+ assert.deepEqual(details.groups.map(g=>g.total),[100.01,33.34,200.02,90.15,10.03]);
+ assert.equal(items.find(it=>it.label==='Cinema').status,'Pago');assert.equal(items.find(it=>it.label==='Prevista').status,'Previsto');
+ assert.equal(items.some(it=>it.label==='Aporte'),false);assert.deepEqual(details.payrollLoans.map(l=>l.amount),[300]);assert.equal(store.exportData(),before);
+});
+test('detalhamento usa fatura informada uma vez, inclusive zero, e revela parcelas somente na estimativa',()=>{
+ clean();const f=store.getState().finance;
+ f.cards=[{id:'test',name:'Teste',dueDay:10}];f.cardCharges=[{id:'p1',cardId:'test',desc:'Notebook',totalAmount:100,installments:3,startMonth:'2026-11'}];
+ const card=ym=>store.expenseBreakdown(ym).groups.find(g=>g.id==='cards');
+ assert.equal(card('2026-11').items[0].installments[0].amount,33.34);assert.equal(card('2026-12').items[0].installments[0].number,2);
+ store.setCardInvoice('test','2026-11',120.75);assert.equal(card('2026-11').total,120.75);assert.equal(card('2026-11').items[0].invoice,true);assert.deepEqual(card('2026-11').items[0].installments,[]);
+ store.setCardInvoice('test','2026-11',0);assert.equal(card('2026-11').items.length,1);assert.equal(card('2026-11').total,0);assert.equal(card('2026-12').total,33.33);
+ assert.equal(store.expenseBreakdown('2026-11').total,store.financialSummary('2026-11').expenses);
+});
+test('detalhamento respeita versões, exclusões, recorrências e primeira parcela apenas em fevereiro',()=>{
+ clean();const f=store.getState().finance;
+ f.loans=[{id:'consignado',name:'Crédito do trabalhador',monthlyAmount:1349.56,installments:45,startMonth:'2027-02',paidInstallments:0}];
+ store.updateFixedBill('aluguel',{amount:1300});
+ store.addFinanceEntry({type:'expense',description:'Assinatura',amount:20,date:'2026-11-05',status:'confirmed',recurring:true});
+ const id=store.financeEntries('2026-11')[0].id;store.updateFinanceOccurrence(id,'2026-12',{deleted:true});
+ for(const ym of ['2026-10','2026-11','2026-12','2027-01','2027-02','2030-10','2030-11'])assert.equal(store.expenseBreakdown(ym).total,store.financialSummary(ym).expenses,ym);
+ const group=(ym,id)=>store.expenseBreakdown(ym).groups.find(g=>g.id===id);
+ assert.equal(group('2026-10','bills').items.find(i=>i.label==='Aluguel').amount,1200);assert.equal(group('2026-11','bills').items.find(i=>i.label==='Aluguel').amount,1300);
+ assert.equal(group('2026-12','variable').items.length,0);assert.equal(group('2027-01','variable').items[0].status,'Previsto');
+ assert.equal(group('2026-12','loans').total,0);assert.equal(group('2027-01','loans').total,0);assert.match(group('2027-02','loans').items[0].detail,/Parcela 1 de 45/);assert.match(group('2030-10','loans').items[0].detail,/Parcela 45 de 45/);assert.equal(group('2030-11','loans').items.length,0);
+});
+test('confirmar pagamento altera somente a situação no detalhamento e mês vazio continua zerado',()=>{
+ clean();const before=store.expenseBreakdown('2026-11');store.togglePaid('2026-11','bill:aluguel');const after=store.expenseBreakdown('2026-11');
+ assert.equal(after.total,before.total);assert.equal(after.groups[0].items[0].status,'Pago');assert.equal(before.groups[0].items[0].status,'Previsto');
+ const f=store.getState().finance;Object.assign(f,{fixedBills:[],cards:[],loans:[],entries:[],variableSpend:{},lisHistory:{}});
+ assert.equal(store.expenseBreakdown('2026-11').total,0);assert.ok(store.expenseBreakdown('2026-11').groups.every(g=>g.items.length===0));
+});

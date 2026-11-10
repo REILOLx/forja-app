@@ -24,7 +24,7 @@ export function render(state) {
     </section>
     ${initialMonthForm(state,ym)}
     <div class="metric-grid">
-      ${metric('Receitas previstas', summary.income, 'positive')}${metric('Despesas previstas', summary.expenses)}${metric('Investimentos do mês', summary.invested, 'positive')}${metric('Patrimônio previsto acumulado', summary.projectedAssets, 'positive')}
+      ${metric('Receitas previstas', summary.income, 'positive')}${metric('Despesas previstas', summary.expenses, '', '#/financeiro/despesas')}${metric('Investimentos do mês', summary.invested, 'positive')}${metric('Patrimônio previsto acumulado', summary.projectedAssets, 'positive')}
     </div>
     <div class="quick-actions">
       <a href="#/financeiro/receita" class="card quick-action">${icon.plus()}<span>Nova receita</span></a>
@@ -87,7 +87,7 @@ function initialMonthForm(state,ym) {
       ${reconciliation?'<button type="button" id="clear-cash-reconciliation" class="btn-ghost">Remover somente o ajuste de saldo</button>':''}
     </form></details>`;
 }
-function metric(label, value, cls='') { return `<div class="metric"><span>${label}</span><strong class="${cls}">${store.formatMoney(value)}</strong></div>`; }
+function metric(label, value, cls='', href='') { const content=`<span>${label}</span><strong class="${cls}">${store.formatMoney(value)}</strong>${href?'<small class="expense-metric-hint">Ver detalhes →</small>':''}`;return href?`<a class="metric expense-metric-link" href="${href}">${content}</a>`:`<div class="metric">${content}</div>`; }
 function incomePreview(ym) {
   const entries=store.financeEntries(ym).filter(e=>e.type==='income');
   return entries.length ? entries.map(e=>`<div class="finance-row"><span><strong>${esc(e.description)}</strong><small>${e.recurring?'Mensal · ':''}${e.status==='confirmed'?'Recebido':'A receber'} · dia ${e.date.slice(8)}</small></span><span class="amount positive">${store.formatMoney(e.amount)}</span></div>`).join('') : `<div class="empty-state"><strong>Nenhuma receita registrada</strong><p>Inclua seu salário e as entradas previstas para enxergar o saldo do mês.</p><a href="#/financeiro/receita" class="btn-link" style="display:inline-block;color:var(--ember)">Adicionar receita →</a></div>`;

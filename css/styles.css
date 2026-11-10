@@ -628,3 +628,29 @@ h2 { font-size: 17px; font-weight: 700; }
 .course-today-summary { gap:8px; }
 .course-today-summary .section-label { margin:0; }
 .course-today-summary p { margin:0; }
+
+/* ---------- detalhamento de despesas ---------- */
+.expense-metric-link { color:var(--text); display:block; text-decoration:none; transition:border-color .15s; }
+.expense-metric-link:hover, .expense-metric-link:focus-visible { border-color:var(--ember); }
+.expense-metric-hint { display:block; color:var(--ember); font-size:10px; margin-top:10px; }
+.expense-subtotal-row { display:flex; align-items:baseline; justify-content:space-between; gap:16px; font-size:13px; line-height:1.7; }
+.expense-subtotal-row > span { min-width:0; overflow-wrap:anywhere; }
+.expense-subtotal-row > strong { flex-shrink:0; font-variant-numeric:tabular-nums; }
+.expense-grand-total { border-top:1px solid var(--border); padding-top:16px; }
+.expense-details-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; align-items:start; }
+.expense-detail-group { min-width:0; }
+.expense-detail-group h2 { font-size:17px; }
+.expense-group-total { font:500 18px 'Space Grotesk',sans-serif; color:var(--ember); }
+.expense-detail-item { padding:16px 0 0; border-top:1px solid var(--border); }
+.expense-item-top { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; }
+.expense-item-top > div { min-width:0; }
+.expense-item-top > div > strong { font-size:13px; overflow-wrap:anywhere; line-height:1.7; }
+.expense-item-top .hint { margin:5px 0 9px; }
+.expense-item-amount { flex-shrink:0; font:500 16px 'Space Grotesk',sans-serif; font-variant-numeric:tabular-nums; margin-top:3px; }
+.expense-invoice-note { margin-top:14px; }
+.expense-installments { margin-top:16px; font-size:12px; }
+.expense-installment-row { display:flex; justify-content:space-between; align-items:baseline; gap:14px; padding:14px 0; border-bottom:1px solid var(--border); }
+.expense-installment-row > span { min-width:0; overflow-wrap:anywhere; line-height:1.7; }
+.expense-installment-row small { display:block; color:var(--text-dim); font-size:11px; }
+.expense-installment-row strong { flex-shrink:0; font-variant-numeric:tabular-nums; }
+@media(max-width:640px) { .expense-details-grid { grid-template-columns:1fr; } .expense-item-top { gap:12px; } .expense-item-amount { font-size:14px; } }

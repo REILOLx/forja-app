@@ -808,6 +808,28 @@ export function monthCommitted(ym = monthKey()) {
   return { bills, cards, loans, payrollLoans, lis, variable, total: sum([bills, cards, loans, lis, variable]) };
 }
 
+// Detalhamento de leitura: usa as mesmas ocorrências e faturas do resumo mensal.
+export function expenseBreakdown(ym = selectedFinanceMonth()) {
+  const f=state.finance,paid=key=>isPaid(ym,key)?'Pago':'Previsto';
+  const groups=[
+    {id:'bills',label:'Contas fixas',items:billsAt(f,ym).map(b=>({id:'bill:'+b.id,label:b.name,amount:b.amount,status:paid('bill:'+b.id),detail:'Vence dia '+b.dueDay}))},
+    {id:'cards',label:'Faturas de cartão',items:f.cards.map(c=>{
+      const invoice=registeredCardInvoice(c.id,ym),amount=cardInvoiceForMonth(c.id,ym);
+      const installments=invoice?[]:f.cardCharges.filter(charge=>charge.cardId===c.id).map(charge=>({id:charge.id,label:charge.desc||'Compra parcelada',amount:installmentAt(charge,ym),number:monthsBetween(charge.startMonth,ym)+1,total:charge.installments})).filter(row=>row.amount>0);
+      return {id:'card:'+c.id,label:'Fatura '+c.name,amount,status:paid('card:'+c.id),detail:(invoice?'Fatura informada':'Estimativa pelas parcelas')+' · vence dia '+c.dueDay,invoice:!!invoice,installments};
+    }).filter(row=>row.amount!==0||row.invoice)},
+    {id:'loans',label:'Empréstimos',items:f.loans.filter(l=>!loanDeductedFromNetSalary(l,ym)).map(l=>({id:'loan:'+l.id,label:l.name,amount:loanAt(l,ym),status:paid('loan:'+l.id),detail:(l.bank?l.bank+' · ':'')+'Parcela '+(monthsBetween(l.startMonth,ym)+1)+' de '+l.installments})).filter(row=>row.amount>0)},
+    {id:'variable',label:'Despesas avulsas e recorrentes',items:[
+      ...entriesAt(f,ym).filter(e=>e.type==='expense').map(e=>({id:'entry:'+e.id,label:e.description||e.category||'Despesa',amount:e.amount,status:e.status==='confirmed'?'Pago':'Previsto',detail:e.date.slice(8)+'/'+e.date.slice(5,7)+(e.recurring?' · recorrente':'')})),
+      ...(f.variableSpend[ym]||[]).map(e=>({id:'legacy:'+e.id,label:e.desc||e.category||'Despesa',amount:e.amount,status:'Pago',detail:(e.date?e.date.slice(8)+'/'+e.date.slice(5,7)+' · ':'')+'Registro anterior'}))
+    ]},
+    {id:'lis',label:'Limite especial provisionado',items:lisAt(f,ym).used?[{id:'lis',label:'Limite especial utilizado',amount:lisAt(f,ym).used,status:paid('lis'),detail:'Valor integral utilizado · sem juros estimados'}]:[]},
+  ];
+  groups.forEach(group=>{group.total=sum(group.items.map(item=>item.amount));});
+  const payrollLoans=f.loans.filter(l=>loanDeductedFromNetSalary(l,ym)).map(l=>({id:l.id,label:l.name,amount:loanAt(l,ym)})).filter(l=>l.amount>0);
+  return {month:ym,groups,total:sum(groups.map(group=>group.total)),payrollLoans};
+}
+
 export function monthPercent(ym = monthKey()) {
   const committed = monthCommitted(ym).total;
   const budget = budgetAt(state, ym);
