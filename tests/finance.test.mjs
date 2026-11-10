@@ -8,7 +8,7 @@ const storage=new Map();
 globalThis.localStorage={getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v)};
 globalThis.window={dispatchEvent(){}};
 let source=await fs.readFile(new URL('../js/store.js',import.meta.url),'utf8');
-source=source.replace("import { sb } from './supabase-client.js';",'const sb = {};').replace("'./finance-model.js'",JSON.stringify(pathToFileURL(resolve('js/finance-model.js')).href));
+source=source.replace("import { sb } from './supabase-client.js';",'const sb = {};').replace("'./finance-model.js'",JSON.stringify(pathToFileURL(resolve('js/finance-model.js')).href)).replace("'./hub-model.js'",JSON.stringify(pathToFileURL(resolve('js/hub-model.js')).href));
 const store=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
 const clean=()=>{store.resetApp();store.selectFinanceMonth('2026-11');};
 

@@ -1,0 +1,7 @@
+import { icon } from '../icons.js';
+const groups=[
+ ['Seu dia',[['/rotina','Rotina','Organize horários e tarefas',icon.clock],['/treino','Treinos','Jiu-jitsu, pedal e atividades em casa',icon.dumbbell],['/estudos','Estudos e leituras','Sua biblioteca e trilha de aprendizado',icon.book],['/metas','Metas','Acompanhe seus objetivos',icon.target],['/bloqueio','Foco','Gerencie seus momentos de concentração',icon.lock]]],
+ ['Sua gestão',[['/financeiro','Financeiro pessoal','Gastos, faturas e investimentos',icon.wallet],['/negocios','Seus negócios','Empresas, faturamento e clientes',icon.business]]],
+ ['Preferências',[['/config','Ajustes e backup','Sua conta, sincronização e dados',icon.gear]]],
+];
+export function render(){return `<header class="hub-heading"><div class="eyebrow">Tudo na sua Forja</div><h1>Menu geral</h1><p>Seu espaço pessoal e seus negócios, cada um no seu lugar.</p></header>${groups.map(([title,items])=>`<section class="hub-section"><h2>${title}</h2><div class="hub-menu-grid">${items.map(([path,label,description,svg])=>`<a href="#${path}" class="card hub-menu-link"><span class="hub-icon">${svg()}</span><span><strong>${label}</strong><small>${description}</small></span><span aria-hidden="true">→</span></a>`).join('')}</div></section>`).join('')}`;}

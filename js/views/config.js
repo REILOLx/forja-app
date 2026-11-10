@@ -10,7 +10,7 @@ export function render() {
     <div class="card" style="border-color:var(--cyan);">
       <div style="font-size:14px;font-weight:700;margin-bottom:8px;">Onde ficam seus dados</div>
       <div class="muted" style="font-size:13px;line-height:1.5;">
-        Suas metas, rotina, treinos, leituras e finanças são vinculados à sua conta.
+        Suas metas, rotina, treinos, leituras, negócios e finanças são vinculados à sua conta.
         Quando a conexão está disponível, o Forja sincroniza com a nuvem. Uma cópia
         fica neste navegador. Se houver uma falha de sincronização, o aviso aparece no topo;
         exporte um backup para manter uma cópia independente.

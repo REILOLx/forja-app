@@ -1,184 +1,36 @@
-import { icon } from '../icons.js';
-import {
-  todayISO, todaysWorkoutPlan, weekWorkoutSummary, weeksStreak, weekdayLabel, weekdayHasTreino,
-} from '../store.js';
-
-const DAY_ABBR = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-let editingDow = null; // weekday sendo editado no momento, ou null
-
+import * as store from '../store.js';
+import { TRAINING_TYPES } from '../hub-model.js';
+import { escapeHTML as esc, toast } from '../ui.js';
+let editing=null,filter='all';
+const option=(value,label,current)=>`<option value="${value}" ${value===current?'selected':''}>${label}</option>`;
 export function render(state) {
-  const now = new Date();
-  const todayDow = now.getDay();
-  const plan = todaysWorkoutPlan(now);
-  const iso = todayISO(now);
-  const log = state.workoutLog[iso];
-  const summary = weekWorkoutSummary(now);
-
-  const strip = [0, 1, 2, 3, 4, 5, 6].map((dow) => {
-    const hasTreino = !!state.workoutPlans[dow];
-    const isToday = dow === todayDow;
-    let bg = 'var(--surface-3)', content;
-    if (!hasTreino) {
-      content = `<span style="font-size:9px;color:var(--text-dim-2);">off</span>`;
-    } else {
-      content = `<span style="width:15px;height:15px;color:${isToday ? 'var(--ember)' : 'var(--text-dim-2)'};display:flex;">${icon.dumbbell()}</span>`;
-    }
-    if (isToday) bg = 'var(--ember-bg)';
-    return `
-      <button data-toggle-edit-dow="${dow}" aria-label="Editar treino de ${weekdayLabel(dow)}" class="stack gap-8" style="align-items:center;border:0;background:none;padding:0;">
-        <span style="font-size:10.5px;color:var(--text-dim);">${DAY_ABBR[dow]}</span>
-        <div style="width:32px;height:32px;border-radius:8px;background:${bg};${isToday ? 'border:1.5px solid var(--ember);' : ''}display:flex;align-items:center;justify-content:center;">
-          ${content}
-        </div>
-      </button>`;
-  }).join('');
-
-  return `
-    <div class="row">
-      <div class="fjc" style="font-size:22px;font-weight:700;">Treino</div>
-      <span class="muted" style="font-size:12px;">Selecione um dia para editar</span>
-    </div>
-    <div class="grid-3" style="grid-template-columns:repeat(7, minmax(0, 1fr));">${strip}</div>
-
-    ${plan ? `
-      <div class="card" style="border-color:var(--ember-border);">
-        <div class="row" style="margin-bottom:14px;align-items:flex-start;">
-          <div>
-            <div class="section-label" style="margin:0;color:var(--ember);">Hoje</div>
-            <div class="fjc" style="font-size:18px;font-weight:700;">${plan.name}</div>
-          </div>
-        </div>
-        <div class="stack" style="border-radius:8px;overflow:hidden;border:1px solid var(--border);">
-          ${plan.exercises.map((ex, i) => `
-            <div class="row" style="background:var(--surface-2);padding:10px 12px;border-bottom:1px solid var(--border);">
-              <span style="font-size:13px;${log && log.exercisesDone && log.exercisesDone.includes(i) ? 'color:var(--text-dim);text-decoration:line-through;' : ''}">${ex.name}</span>
-              <span class="muted" style="font-size:12.5px;">${ex.sets}</span>
-            </div>
-          `).join('')}
-        </div>
-        ${log && log.completed
-          ? `<div class="pill pill-green" style="display:inline-block;margin-top:14px;">Treino concluído hoje</div>`
-          : `<a href="#/treino/verificacao" class="btn btn-primary" style="display:block;text-align:center;margin-top:14px;text-decoration:none;">Iniciar treino →</a>`}
-      </div>
-    ` : `
-      <div class="card" style="text-align:center;">
-        <div style="font-size:14px;font-weight:600;">Dia de descanso</div>
-        <div class="muted" style="font-size:12.5px;margin-top:4px;">Sem treino de força planejado — aproveite para recuperar.</div>
-      </div>
-    `}
-
-    <div>
-      <div class="section-label">Resumo da semana</div>
-      <div class="grid-2">
-        <div class="card">
-          <div class="fjc" style="font-size:22px;font-weight:700;">${summary.done}/${summary.planned}</div>
-          <div class="muted" style="font-size:12px;">treinos concluídos</div>
-        </div>
-        <div class="card">
-          <div class="fjc" style="font-size:22px;font-weight:700;">${weeksStreak(now)}</div>
-          <div class="muted" style="font-size:12px;">semanas seguidas</div>
-        </div>
-      </div>
-    </div>
-
-    <div>
-      <div class="section-label">Plano da semana</div>
-      <div class="stack gap-8">
-        ${[0, 1, 2, 3, 4, 5, 6].map((dow) => {
-          const p = state.workoutPlans[dow];
-          const isEditing = editingDow === dow;
-          return `
-            <div class="card" style="${dow === todayDow ? 'border-color:var(--ember-border);' : ''}">
-              <button data-toggle-edit-dow="${dow}" class="row" style="width:100%;background:none;border:none;padding:0;color:inherit;">
-                <span style="font-size:13.5px;font-weight:600;">${weekdayLabel(dow)}</span>
-                <span class="row gap-8" style="width:auto;">
-                  <span style="font-size:12.5px;color:${p ? 'var(--text)' : 'var(--text-dim-2)'};">${p ? p.name : 'Off (descanso)'}</span>
-                  <span style="width:14px;height:14px;color:var(--text-dim-2);display:flex;transform:rotate(${isEditing ? '90' : '0'}deg);">${icon.chevronRight()}</span>
-                </span>
-              </button>
-              ${isEditing ? renderDayEditor(dow, p) : ''}
-            </div>`;
-        }).join('')}
-      </div>
-    </div>
-  `;
+  const today=store.todayISO(),week=store.trainingSummary(today),entry=state.trainingSessions.find(e=>e.id===editing);
+  const sessions=state.trainingSessions.filter(e=>filter==='all'||e.type===filter).sort((a,b)=>b.date.localeCompare(a.date)||b.createdAt.localeCompare(a.createdAt));
+  return `<header class="hub-heading"><div class="eyebrow">Movimento que cabe na sua rotina</div><h1>Treinos</h1><p>Jiu-jitsu, pedal e treino em casa. Cada sessão conta.</p></header>
+    <section class="card hub-hero"><span class="section-label">Sua semana</span><div class="hub-number">${week.done}<span> / ${state.weeklyTrainingGoal} treinos</span></div><div class="progress-track"><div class="progress-fill" style="width:${Math.min(100,week.done/state.weeklyTrainingGoal*100)}%"></div></div><div class="hub-stat-line"><span>${week.minutes} min registrados</span><span>${week.distance.toLocaleString('pt-BR')} km de pedal</span><span>${week.planned} planejados</span></div></section>
+    <div class="hub-type-grid">${Object.entries(TRAINING_TYPES).slice(0,3).map(([type,label])=>`<button class="card hub-type" data-training-type="${type}"><span class="hub-type-symbol">${type==='jiujitsu'?'JJ':type==='pedal'?'↗':'⌂'}</span><strong>${label}</strong><small>${week.byType[type]} nesta semana</small><span class="hint">Registrar →</span></button>`).join('')}</div>
+    <section class="card hub-section"><div class="hub-section-title"><h2>${entry?'Editar treino':'Registrar ou planejar treino'}</h2>${entry?'<button class="btn-link" id="cancel-training">Cancelar edição</button>':''}</div>
+      <form id="training-form" class="stack gap-10"><div class="form-grid"><label class="field">Modalidade<select name="type">${Object.entries(TRAINING_TYPES).map(([v,l])=>option(v,l,entry?.type||'jiujitsu')).join('')}</select></label><label class="field">Data<input name="date" type="date" value="${entry?.date||today}" required></label></div>
+        <div class="form-grid"><label class="field">Duração (minutos)<input name="duration" type="number" min="1" step="1" value="${entry?.duration||60}" required></label><label class="field" id="distance-field">Distância do pedal (km)<input name="distance" type="number" min="0" step="0.1" value="${entry?.distance||0}"></label></div>
+        <div class="form-grid"><label class="field">Intensidade<select name="intensity">${[['leve','Leve'],['moderada','Moderada'],['intensa','Intensa']].map(([v,l])=>option(v,l,entry?.intensity||'moderada')).join('')}</select></label><label class="field">Situação<select name="status">${option('done','Realizado',entry?.status||'done')}${option('planned','Planejado',entry?.status)}</select></label></div>
+        <label class="field">O que treinou / observações<textarea name="notes" rows="3" maxlength="1200" placeholder="Técnicas, rolas, percurso ou exercícios feitos em casa…">${esc(entry?.notes||'')}</textarea></label>
+        <p class="form-error" role="alert" id="training-error"></p><button class="btn btn-primary">${entry?'Salvar treino':'Registrar treino'}</button></form>
+    </section>
+    <section class="hub-section"><div class="hub-section-title"><h2>Seu histórico</h2><label class="field"><select id="training-filter" aria-label="Filtrar treinos">${option('all','Todas as modalidades',filter)}${Object.entries(TRAINING_TYPES).map(([v,l])=>option(v,l,filter)).join('')}</select></label></div>
+      ${sessions.length?`<div class="stack gap-10">${sessions.map(e=>`<article class="card"><div class="hub-section-title"><div><span class="pill ${e.status==='done'?'pill-green':'pill-dim'}">${e.status==='done'?'Realizado':'Planejado'}</span><h3>${TRAINING_TYPES[e.type]}</h3><p class="hint">${e.date.split('-').reverse().join('/')} · ${e.duration} min${e.type==='pedal'?` · ${e.distance.toLocaleString('pt-BR')} km`:''} · ${e.intensity}</p></div></div>${e.notes?`<p class="hub-note">${esc(e.notes)}</p>`:''}<div class="hub-actions">${e.status==='planned'&&e.date<=today?`<button class="btn-link" data-complete-training="${e.id}">Confirmar realização</button>`:''}<button class="btn-link" data-edit-training="${e.id}">Editar</button><button class="btn-link" data-delete-training="${e.id}">Excluir</button></div></article>`).join('')}</div>`:'<div class="card empty-state"><strong>Comece pelo treino de hoje</strong><p>Registre uma sessão ou planeje a próxima atividade.</p></div>'}
+    </section>
+    <details class="card"><summary>Meta semanal e registros anteriores</summary><form id="training-goal-form" class="hub-inline-form"><label class="field">Treinos por semana<input name="goal" type="number" min="1" max="21" value="${state.weeklyTrainingGoal}" required></label><button class="btn-ghost">Salvar meta</button></form><p class="hint">${week.legacy} treino(s) concluído(s) no plano anterior entram no total desta semana. Seus planos e registros anteriores continuam disponíveis.</p><a href="#/treino/plano" class="btn-link">Abrir plano e histórico anterior →</a></details>`;
 }
-
-function renderDayEditor(dow, plan) {
-  return `
-    <div class="stack gap-8" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
-      <label class="row" style="cursor:pointer;">
-        <span style="font-size:12.5px;">Dia de treino</span>
-        <input type="checkbox" data-toggle-off="${dow}" ${plan ? 'checked' : ''}>
-      </label>
-
-      ${plan ? `
-        <input type="text" data-plan-name="${dow}" value="${plan.name}" placeholder="Nome do treino (ex: Full Body A)">
-        <div class="stack gap-8">
-          ${plan.exercises.map((ex, i) => `
-            <div class="row gap-8">
-              <input type="text" data-ex-name="${dow}:${i}" value="${ex.name}" placeholder="Exercício" style="flex:2;">
-              <input type="text" data-ex-sets="${dow}:${i}" value="${ex.sets}" placeholder="4×8" style="flex:1;">
-              <button data-remove-ex="${dow}:${i}" style="background:none;border:none;color:var(--red);display:flex;padding:4px;">${icon.trash()}</button>
-            </div>
-          `).join('')}
-        </div>
-        <button data-add-ex="${dow}" class="btn-ghost">+ Exercício</button>
-      ` : ''}
-    </div>
-  `;
-}
-
-export function afterRender(container, { render }) {
-  container.querySelectorAll('[data-toggle-edit-dow]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const dow = parseInt(btn.dataset.toggleEditDow, 10);
-      editingDow = editingDow === dow ? null : dow;
-      render();
-    });
-  });
-
-  const store = window.__forja.store;
-
-  container.querySelectorAll('[data-toggle-off]').forEach((chk) => {
-    chk.addEventListener('change', () => {
-      const dow = parseInt(chk.dataset.toggleOff, 10);
-      if (chk.checked) store.setWorkoutPlanForDay(dow, { name: 'Treino', exercises: [] });
-      else store.setWorkoutPlanForDay(dow, null);
-      render();
-    });
-  });
-
-  container.querySelectorAll('[data-plan-name]').forEach((input) => {
-    input.addEventListener('change', () => {
-      store.renameWorkoutPlan(parseInt(input.dataset.planName, 10), input.value);
-    });
-  });
-
-  container.querySelectorAll('[data-ex-name]').forEach((input) => {
-    input.addEventListener('change', () => {
-      const [dow, idx] = input.dataset.exName.split(':').map(Number);
-      store.updateExerciseInPlan(dow, idx, { name: input.value });
-    });
-  });
-  container.querySelectorAll('[data-ex-sets]').forEach((input) => {
-    input.addEventListener('change', () => {
-      const [dow, idx] = input.dataset.exSets.split(':').map(Number);
-      store.updateExerciseInPlan(dow, idx, { sets: input.value });
-    });
-  });
-  container.querySelectorAll('[data-remove-ex]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const [dow, idx] = btn.dataset.removeEx.split(':').map(Number);
-      store.removeExerciseFromPlan(dow, idx);
-      render();
-    });
-  });
-  container.querySelectorAll('[data-add-ex]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const dow = parseInt(btn.dataset.addEx, 10);
-      store.addExerciseToPlan(dow, { name: '', sets: '' });
-      render();
-    });
-  });
+export function afterRender(container,{render}) {
+  const form=container.querySelector('#training-form');
+  const update=()=>{container.querySelector('#distance-field').hidden=form.elements.type.value!=='pedal';const future=form.elements.date.value>store.todayISO();form.elements.status.options[0].disabled=future;if(future)form.elements.status.value='planned';};update();
+  form.elements.type.addEventListener('change',update);form.elements.date.addEventListener('change',update);
+  form.addEventListener('submit',e=>{e.preventDefault();try{store.saveTrainingSession(Object.fromEntries(new FormData(form)),editing);editing=null;render();toast('Treino salvo.');}catch(error){container.querySelector('#training-error').textContent=error.message;}});
+  container.querySelectorAll('[data-training-type]').forEach(el=>el.addEventListener('click',()=>{form.elements.type.value=el.dataset.trainingType;update();form.scrollIntoView({behavior:'smooth',block:'start'});}));
+  container.querySelector('#cancel-training')?.addEventListener('click',()=>{editing=null;render();});
+  container.querySelector('#training-filter').addEventListener('change',e=>{filter=e.target.value;render();});
+  container.querySelectorAll('[data-edit-training]').forEach(el=>el.addEventListener('click',()=>{editing=el.dataset.editTraining;render();container.querySelector('#training-form').scrollIntoView({behavior:'smooth',block:'start'});}));
+  container.querySelectorAll('[data-delete-training]').forEach(el=>el.addEventListener('click',()=>{if(!confirm('Excluir este treino?'))return;store.removeTrainingSession(el.dataset.deleteTraining);if(editing===el.dataset.deleteTraining)editing=null;render();}));
+  container.querySelectorAll('[data-complete-training]').forEach(el=>el.addEventListener('click',()=>{try{const entry=store.getState().trainingSessions.find(e=>e.id===el.dataset.completeTraining);store.saveTrainingSession({...entry,status:'done'},entry.id);render();}catch(error){toast(error.message);}}));
+  container.querySelector('#training-goal-form').addEventListener('submit',e=>{e.preventDefault();try{store.setWeeklyTrainingGoal(Number(e.currentTarget.elements.goal.value));render();toast('Meta semanal salva.');}catch(error){toast(error.message);}});
 }

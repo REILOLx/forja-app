@@ -2,6 +2,8 @@
 const wrap = (inner, extra = '') => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" ${extra}>${inner}</svg>`;
 
 export const icon = {
+  more: () => wrap('<circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/>'),
+  business: () => wrap('<rect x="4" y="7" width="16" height="14" rx="1.5"/><path d="M8 7V3h8v4M8 11h1M15 11h1M8 15h1M15 15h1M10 21v-3h4v3"/>'),
   home: () => wrap('<path d="M4 11.5 12 4l8 7.5"/><path d="M6 10v9h5v-5h2v5h5v-9"/>'),
   clock: () => wrap('<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v5l3.5 2"/>'),
   dumbbell: () => wrap('<path d="M4 12h16"/><rect x="2" y="9" width="3" height="6" rx="1"/><rect x="19" y="9" width="3" height="6" rx="1"/><rect x="6" y="7" width="2.5" height="10" rx="1"/><rect x="15.5" y="7" width="2.5" height="10" rx="1"/>'),

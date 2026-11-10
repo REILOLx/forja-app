@@ -8,6 +8,16 @@ Com Node.js instalado, execute `node dev-server.mjs` nesta pasta e abra
 http://localhost:5173. A autenticação e a sincronização usam o projeto configurado
 em `js/supabase-client.js` e a tabela Supabase `app_state` já utilizada pelo app.
 
+## Painel, treinos, leituras e negócios
+
+- A inicial destaca a tarefa atual ou seguinte, pendências do dia, margem financeira, faturas, treinos da semana, livros em andamento e resumo empresarial.
+- A navegação fixa reúne Início, Rotina, Financeiro, Negócios e **… Menu**. O menu geral abre treinos, estudos, metas, foco e ajustes, além das áreas principais.
+- Treinos permitem várias sessões por dia de jiu-jitsu, pedal, casa e outras atividades, com duração, distância do pedal, intensidade, notas e situação planejada/realizada. A semana vai de segunda a domingo. Os planos e registros de força antigos continuam acessíveis em **Treinos → Meta semanal e registros anteriores**.
+- A biblioteca aceita vários livros em leitura simultânea, fila, pausados e concluídos. Cada sessão mantém livro, página, minutos e anotações; os minutos somam à meta diária. O livro atual e a fila antigos são migrados uma única vez, sem apagar seus registros anteriores. Excluir uma sessão retira seus minutos da meta, mantendo a página do livro para ajuste em Editar, se necessário.
+- Negócios inicia com LumeqIA, Alfa tauri innovation group e Reis e Reis construtora, sem números fictícios. Os indicadores podem ser filtrados por empresa e mês de competência. Faturamento inclui receitas faturadas pendentes; recebido/pago compõem a movimentação realizada. Resultado = faturamento − despesas. Margem não é calculada quando não há faturamento.
+- Clientes podem estar ativos, em negociação ou inativos, com contato e observações. Seus indicadores refletem a situação atual do cadastro e a data de entrada, sem reconstruir mudanças históricas de situação. Metas de faturamento são específicas de cada empresa/mês.
+- Os lançamentos empresariais são manuais e independentes do financeiro pessoal. Os novos dados usam o mesmo backup e sincronização da conta, sem novas tabelas.
+
 ## Financeiro
 
 - O mês selecionado vale para resumo, lançamentos, cartões, pagamentos e investimentos.

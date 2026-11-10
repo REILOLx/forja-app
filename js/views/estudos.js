@@ -1,194 +1,35 @@
-import { icon } from '../icons.js';
-import { todayISO, formatHM } from '../store.js';
-
-let editingGoal = false;
-let editingTrack = false;
-let editingBook = false;
-
+import * as store from '../store.js';
+import { BOOK_STATUSES } from '../hub-model.js';
+import { escapeHTML as esc, toast } from '../ui.js';
+let editing=null,filter='reading',readingBook=null;
+const options=(list,current)=>Object.entries(list).map(([v,l])=>`<option value="${v}" ${v===current?'selected':''}>${l}</option>`).join('');
 export function render(state) {
-  const iso = todayISO();
-  const minutesToday = state.readingLog[iso] || 0;
-  const goalMet = minutesToday >= state.dailyReadingGoalMin;
-  const book = state.currentBook;
-  const bookPct = book.pageTotal ? Math.round((book.pageCurrent / book.pageTotal) * 100) : 0;
-  const track = state.studyTrack;
-  const trackPct = track.totalModules ? Math.round((track.module / track.totalModules) * 100) : 0;
-
-  return `
-    <div><div class="eyebrow">Conhecimento que se acumula</div><h1>Estudos</h1><p class="page-description">Um pouco de leitura. Um passo na sua trilha.</p></div>
-
-    <div>
-      <div class="row" style="margin-bottom:10px;">
-        <span class="section-label" style="margin:0;">Meta diária</span>
-        <button id="btn-edit-goal" style="background:none;border:none;color:var(--text-dim-2);display:flex;">${icon.gear()}</button>
-      </div>
-      <div class="card" style="border-color:var(--cyan);">
-        ${editingGoal ? `
-          <div class="row gap-8">
-            <input type="number" id="goal-minutes" value="${state.dailyReadingGoalMin}" style="flex:1;">
-            <span class="muted" style="font-size:12.5px;">minutos por dia</span>
-          </div>
-        ` : `
-          <div class="row">
-            <div class="stack">
-              <span style="font-size:14px;font-weight:700;">${state.dailyReadingGoalMin} minutos de leitura</span>
-              <span class="muted" style="font-size:12px;margin-top:2px;">Hoje: ${formatHM(minutesToday)}${goalMet ? ' · meta batida' : ''}</span>
-            </div>
-            <span class="check ${goalMet ? 'checked' : ''}" style="border-color:var(--cyan);${goalMet ? 'background:var(--cyan);border-color:var(--cyan);' : ''}">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="oklch(0.16 0.05 200)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>
-            </span>
-          </div>
-          <div class="row gap-8" style="margin-top:14px;">
-            ${[5, 15, 20].map((mins) => `
-              <button data-action="logReading" data-minutes="${mins}" data-date="${iso}"
-                style="flex:1;padding:9px 0;border-radius:8px;background:var(--surface-3);border:none;color:var(--text);font-size:12.5px;font-weight:600;">+${mins} min</button>
-            `).join('')}
-          </div>
-        `}
-      </div>
-    </div>
-
-    <div>
-      <div class="row" style="margin-bottom:10px;">
-        <span class="section-label" style="margin:0;">Trilha de estudo</span>
-        <button id="btn-edit-track" style="background:none;border:none;color:var(--text-dim-2);display:flex;">${icon.gear()}</button>
-      </div>
-      <div class="card">
-        ${editingTrack ? `
-          <div class="stack gap-8">
-            <input type="text" id="track-title" value="${track.title}" placeholder="Nome da trilha">
-            <input type="text" id="track-topic" value="${track.nextTopic}" placeholder="Próximo módulo/tópico">
-            <div class="row gap-8">
-              <input type="number" id="track-module" value="${track.module}" placeholder="Módulo atual" style="flex:1;">
-              <input type="number" id="track-total" value="${track.totalModules}" placeholder="Total de módulos" style="flex:1;">
-            </div>
-          </div>
-        ` : `
-          <div style="font-size:15px;font-weight:700;margin-bottom:4px;">${track.title} — Módulo ${track.module}</div>
-          <div class="muted" style="font-size:12.5px;margin-bottom:12px;">Próximo: ${track.nextTopic}</div>
-          <div class="progress-track thin"><div class="progress-fill" style="width:${trackPct}%;background:var(--cyan);"></div></div>
-          <div class="muted" style="font-size:11.5px;margin-top:6px;">Módulo ${track.module} de ${track.totalModules}</div>
-        `}
-      </div>
-    </div>
-
-    <div>
-      <div class="row" style="margin-bottom:10px;">
-        <span class="section-label" style="margin:0;">Leitura atual</span>
-        <button id="btn-edit-book" style="background:none;border:none;color:var(--text-dim-2);display:flex;">${icon.gear()}</button>
-      </div>
-      <div class="card">
-        ${editingBook ? `
-          <div class="stack gap-8">
-            <input type="text" id="book-title" value="${book.title}" placeholder="Título do livro">
-            <input type="text" id="book-author" value="${book.author}" placeholder="Autor">
-            <div class="row gap-8">
-              <input type="number" id="book-page-current" value="${book.pageCurrent}" placeholder="Página atual" style="flex:1;">
-              <input type="number" id="book-page-total" value="${book.pageTotal}" placeholder="Total de páginas" style="flex:1;">
-            </div>
-          </div>
-        ` : `
-          <div class="row gap-14">
-            <div style="width:46px;height:64px;border-radius:5px;background:var(--ember-bg);flex-shrink:0;"></div>
-            <div style="flex:1;">
-              <div style="font-size:14px;font-weight:700;">${book.title}</div>
-              <div class="muted" style="font-size:12px;margin-bottom:8px;">${book.author}</div>
-              <div class="progress-track" style="height:5px;"><div class="progress-fill" style="width:${bookPct}%;background:var(--ember);"></div></div>
-              <div class="muted" style="font-size:11px;margin-top:4px;">Pág. ${book.pageCurrent} de ${book.pageTotal}</div>
-            </div>
-          </div>
-        `}
-      </div>
-    </div>
-
-    <div class="card stack gap-10"><h2>Registrar progresso</h2><div class="form-grid"><label class="field">Página atual<input id="quick-page" type="number" min="0" max="${book.pageTotal || 100000}" value="${book.pageCurrent}"></label><label class="field">Módulos concluídos<input id="quick-module" type="number" min="0" max="${track.totalModules}" value="${track.module}"></label></div><button id="save-study-progress" class="btn btn-primary">Salvar progresso</button><p class="hint">Os minutos de leitura são registrados na meta diária acima.</p></div>
-    <div>
-      <div class="row" style="margin-bottom:10px;">
-        <span class="section-label" style="margin:0;">Na fila</span>
-      </div>
-      <div class="stack gap-8">
-        ${state.bookQueue.map((b, i) => `
-          <div class="row card card-tight">
-            <span style="font-size:13.5px;">${b.title}</span>
-            <span class="row gap-8" style="width:auto;">
-              <button data-start-book="${i}" style="background:none;border:none;color:var(--ember);font-size:11px;font-weight:700;">começar</button>
-              <button data-remove-book="${i}" style="background:none;border:none;color:var(--text-dim-2);display:flex;width:13px;height:13px;">${icon.trash()}</button>
-            </span>
-          </div>
-        `).join('') || '<div class="muted" style="font-size:13px;">Fila vazia.</div>'}
-        <div class="row gap-8" style="margin-top:4px;">
-          <input type="text" id="new-book-title" placeholder="Adicionar livro à fila..." style="flex:1;">
-          <button id="btn-add-book" style="background:var(--surface-3);border:none;border-radius:10px;color:var(--text);display:flex;padding:0 14px;">${icon.plus()}</button>
-        </div>
-      </div>
-    </div>
-  `;
+  const today=store.todayISO(),minutes=state.readingLog[today]||0,goal=state.dailyReadingGoalMin,books=state.books;
+  const active=books.filter(b=>b.status==='reading'),finished=books.filter(b=>b.status==='finished'),edit=books.find(b=>b.id===editing);
+  const visible=books.filter(b=>filter==='all'||b.status===filter),selected=books.find(b=>b.id===readingBook)||active[0]||books[0];
+  const sessions=[...state.readingSessions].sort((a,b)=>b.date.localeCompare(a.date)||b.createdAt.localeCompare(a.createdAt));
+  return `<header class="hub-heading"><div class="eyebrow">Conhecimento em movimento</div><h1>Estudos e leituras</h1><p>Vários livros, uma rotina de aprendizado. Continue de onde parou em cada um.</p></header>
+    <section class="card hub-hero"><span class="section-label">Leitura de hoje</span><div class="hub-number">${minutes}<span> / ${goal} min</span></div><div class="progress-track"><div class="progress-fill" style="width:${goal>0?Math.min(100,minutes/goal*100):0}%"></div></div><div class="hub-stat-line"><span>${active.length} em leitura</span><span>${finished.length} concluídos</span><span>${minutes>=goal?'Meta de hoje alcançada':'Cada sessão soma à sua meta'}</span></div></section>
+    <section class="hub-section"><div class="hub-section-title"><h2>Sua biblioteca</h2><button id="new-book" class="btn-ghost">+ Adicionar livro</button></div>
+      <div class="hub-tabs" role="group" aria-label="Filtrar biblioteca">${Object.entries({reading:'Lendo',queued:'Quero ler',finished:'Concluídos',paused:'Pausados',all:'Todos'}).map(([v,l])=>`<button class="chip ${filter===v?'active':''}" data-book-filter="${v}" aria-pressed="${filter===v}">${l}</button>`).join('')}</div>
+      ${visible.length?`<div class="hub-book-grid">${visible.map(b=>{const pct=b.pageTotal?Math.min(100,Math.round(b.pageCurrent/b.pageTotal*100)):0;return `<article class="card hub-book"><div class="hub-book-top"><div class="hub-book-spine" aria-hidden="true">${esc(b.title.slice(0,1))}</div><div><span class="pill pill-dim">${BOOK_STATUSES[b.status]}</span><h3>${esc(b.title)}</h3><p class="hint">${esc(b.author||'Autor não informado')}</p></div></div><div class="progress-track thin"><div class="progress-fill" style="width:${pct}%"></div></div><div class="hub-stat-line"><span>Página ${b.pageCurrent}${b.pageTotal?' de '+b.pageTotal:' · total a informar'}</span><span>${pct}%</span></div><div class="hub-actions"><button class="btn-link" data-read-book="${b.id}">${b.status==='queued'?'Começar leitura':'Registrar leitura'}</button><button class="btn-link" data-edit-book="${b.id}">Editar</button><button class="btn-link" data-delete-book="${b.id}">Excluir</button></div></article>`;}).join('')}</div>`:'<div class="card empty-state"><strong>Nenhum livro neste filtro</strong><p>Adicione uma leitura ou abra outra parte da biblioteca.</p></div>'}
+    </section>
+    <details class="card hub-section" id="book-editor" ${editing==='new'||edit?'open':''}><summary>${edit?'Editar livro':'Adicionar livro à biblioteca'}</summary><form id="book-form" class="stack gap-10" style="margin-top:16px"><label class="field">Título<input name="title" maxlength="160" value="${esc(edit?.title||'')}" required></label><label class="field">Autor<input name="author" maxlength="120" value="${esc(edit?.author||'')}"></label><div class="form-grid"><label class="field">Página atual<input name="pageCurrent" type="number" min="0" step="1" value="${edit?.pageCurrent||0}" required></label><label class="field">Total de páginas (0 se não souber)<input name="pageTotal" type="number" min="0" step="1" value="${edit?.pageTotal||0}" required></label></div><label class="field">Situação<select name="status">${options(BOOK_STATUSES,edit?.status||'reading')}</select></label><p class="form-error" role="alert" id="book-error"></p><button class="btn btn-primary">Salvar livro</button>${edit?'<button type="button" class="btn-ghost" id="cancel-book">Cancelar edição</button>':''}</form></details>
+    <section class="card hub-section" id="reading-section"><h2>Registrar uma sessão de leitura</h2>${books.length?`<form id="reading-form" class="stack gap-10"><label class="field">Livro<select name="bookId">${books.map(b=>`<option value="${b.id}" ${b.id===selected?.id?'selected':''}>${esc(b.title)}</option>`).join('')}</select></label><div class="form-grid"><label class="field">Data<input name="date" type="date" max="${today}" value="${today}" required></label><label class="field">Minutos lidos<input name="minutes" type="number" min="1" step="1" value="20" required></label></div><label class="field">Página em que parou<input name="page" type="number" min="0" step="1" value="${selected?.pageCurrent||0}" required></label><label class="field">Anotações<textarea name="notes" rows="3" maxlength="1200" placeholder="Ideias, aprendizados ou algo para revisitar…"></textarea></label><p class="form-error" role="alert" id="reading-error"></p><button class="btn btn-primary">Salvar leitura</button></form>`:'<p class="hint">Adicione o primeiro livro para começar.</p>'}</section>
+    <details class="card"><summary>Sessões e anotações (${sessions.length})</summary><div class="stack gap-10" style="margin-top:14px">${sessions.slice(0,30).map(e=>`<article><strong>${esc(books.find(b=>b.id===e.bookId)?.title||e.bookTitle)}</strong><p class="hint">${e.date.split('-').reverse().join('/')} · ${e.minutes} min · página ${e.page}</p>${e.notes?`<p class="hub-note">${esc(e.notes)}</p>`:''}<button class="btn-link" data-delete-reading="${e.id}">Excluir sessão</button></article>`).join('')||'<p class="hint">As novas sessões aparecerão aqui. Os minutos registrados antes da atualização foram preservados na meta diária.</p>'}</div></details>
+    <details class="card"><summary>Trilha de estudo e meta diária</summary><form id="study-settings-form" class="stack gap-10" style="margin-top:16px"><label class="field">Meta de leitura (minutos/dia)<input name="goal" type="number" min="1" max="1440" value="${goal}" required></label><label class="field">Trilha ou curso<input name="title" value="${esc(state.studyTrack.title)}" required maxlength="160"></label><label class="field">Próximo tópico<input name="nextTopic" value="${esc(state.studyTrack.nextTopic)}" maxlength="160"></label><div class="form-grid"><label class="field">Módulos concluídos<input name="module" type="number" min="0" value="${state.studyTrack.module}" step="1" required></label><label class="field">Total de módulos<input name="totalModules" type="number" min="1" value="${state.studyTrack.totalModules}" step="1" required></label></div><p class="form-error" role="alert" id="study-error"></p><button class="btn btn-primary">Salvar trilha e meta</button></form></details>`;
 }
-
-export function afterRender(container, { render }) {
-  const store = window.__forja.store;
-  container.querySelector('#save-study-progress').addEventListener('click', () => {
-    const page = container.querySelector('#quick-page'), module = container.querySelector('#quick-module');
-    if (!page.reportValidity() || !module.reportValidity()) return;
-    store.updateCurrentBook({ pageCurrent: Number(page.value) });
-    store.updateStudyTrack({ module: Number(module.value) }); render();
-  });
-
-  const goalBtn = container.querySelector('#btn-edit-goal');
-  if (goalBtn) goalBtn.addEventListener('click', () => { editingGoal = !editingGoal; render(); });
-  const goalInput = container.querySelector('#goal-minutes');
-  if (goalInput) goalInput.addEventListener('change', () => {
-    store.setDailyReadingGoal(parseInt(goalInput.value || '0', 10));
-    editingGoal = false;
-    render();
-  });
-
-  const trackBtn = container.querySelector('#btn-edit-track');
-  if (trackBtn) trackBtn.addEventListener('click', () => { editingTrack = !editingTrack; render(); });
-  ['track-title', 'track-topic', 'track-module', 'track-total'].forEach((id) => {
-    const el = container.querySelector('#' + id);
-    if (el) el.addEventListener('change', () => {
-      store.updateStudyTrack({
-        title: container.querySelector('#track-title').value,
-        nextTopic: container.querySelector('#track-topic').value,
-        module: parseInt(container.querySelector('#track-module').value || '0', 10),
-        totalModules: parseInt(container.querySelector('#track-total').value || '0', 10),
-      });
-    });
-  });
-
-  const bookBtn = container.querySelector('#btn-edit-book');
-  if (bookBtn) bookBtn.addEventListener('click', () => { editingBook = !editingBook; render(); });
-  ['book-title', 'book-author', 'book-page-current', 'book-page-total'].forEach((id) => {
-    const el = container.querySelector('#' + id);
-    if (el) el.addEventListener('change', () => {
-      store.updateCurrentBook({
-        title: container.querySelector('#book-title').value,
-        author: container.querySelector('#book-author').value,
-        pageCurrent: parseInt(container.querySelector('#book-page-current').value || '0', 10),
-        pageTotal: parseInt(container.querySelector('#book-page-total').value || '0', 10),
-      });
-    });
-  });
-
-  container.querySelectorAll('[data-start-book]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      store.startBookFromQueue(parseInt(btn.dataset.startBook, 10));
-      render();
-    });
-  });
-  container.querySelectorAll('[data-remove-book]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      store.removeBookFromQueue(parseInt(btn.dataset.removeBook, 10));
-      render();
-    });
-  });
-  const addBookBtn = container.querySelector('#btn-add-book');
-  if (addBookBtn) addBookBtn.addEventListener('click', () => {
-    const input = container.querySelector('#new-book-title');
-    const title = input.value.trim();
-    if (!title) return;
-    store.addBookToQueue(title);
-    render();
-  });
+export function afterRender(container,{render}) {
+  container.querySelectorAll('[data-book-filter]').forEach(el=>el.addEventListener('click',()=>{filter=el.dataset.bookFilter;render();}));
+  container.querySelector('#new-book').addEventListener('click',()=>{editing='new';render();container.querySelector('#book-editor').scrollIntoView({behavior:'smooth',block:'start'});} );
+  container.querySelectorAll('[data-edit-book]').forEach(el=>el.addEventListener('click',()=>{editing=el.dataset.editBook;render();container.querySelector('#book-editor').scrollIntoView({behavior:'smooth',block:'start'});}));
+  container.querySelector('#cancel-book')?.addEventListener('click',()=>{editing=null;render();});
+  container.querySelector('#book-form').addEventListener('submit',e=>{e.preventDefault();try{const d=Object.fromEntries(new FormData(e.currentTarget));store.saveBook(d,editing&&editing!=='new'?editing:null);editing=null;filter=d.status;render();toast('Livro salvo.');}catch(error){container.querySelector('#book-error').textContent=error.message;}});
+  container.querySelectorAll('[data-read-book]').forEach(el=>el.addEventListener('click',()=>{readingBook=el.dataset.readBook;render();container.querySelector('#reading-section').scrollIntoView({behavior:'smooth',block:'start'});}));
+  const reading=container.querySelector('#reading-form');
+  reading?.elements.bookId.addEventListener('change',()=>{const book=store.getState().books.find(b=>b.id===reading.elements.bookId.value);reading.elements.page.value=book.pageCurrent;});
+  reading?.addEventListener('submit',e=>{e.preventDefault();try{store.registerReading(Object.fromEntries(new FormData(reading)));readingBook=reading.elements.bookId.value;render();toast('Leitura registrada.');}catch(error){container.querySelector('#reading-error').textContent=error.message;}});
+  container.querySelectorAll('[data-delete-book]').forEach(el=>el.addEventListener('click',()=>{if(!confirm('Excluir o livro da biblioteca? As sessões e os minutos já registrados serão preservados.'))return;store.removeBook(el.dataset.deleteBook);if(editing===el.dataset.deleteBook)editing=null;render();}));
+  container.querySelectorAll('[data-delete-reading]').forEach(el=>el.addEventListener('click',()=>{if(!confirm('Excluir esta sessão e retirar seus minutos da meta diária? A página atual do livro será mantida.'))return;store.removeReadingSession(el.dataset.deleteReading);render();}));
+  container.querySelector('#study-settings-form').addEventListener('submit',e=>{e.preventDefault();const d=Object.fromEntries(new FormData(e.currentTarget)),goal=Number(d.goal),module=Number(d.module),total=Number(d.totalModules);try{if(!Number.isInteger(goal)||goal<1||goal>1440||!Number.isInteger(module)||!Number.isInteger(total)||total<1||module<0||module>total)throw new Error('Confira a meta e a quantidade de módulos.');store.setDailyReadingGoal(goal);store.updateStudyTrack({title:d.title.trim(),nextTopic:d.nextTopic.trim(),module,totalModules:total});render();toast('Trilha e meta salvas.');}catch(error){container.querySelector('#study-error').textContent=error.message;}});
 }

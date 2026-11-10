@@ -1,3 +1,4 @@
+import * as hub from './hub-model.js';
 import { sb } from './supabase-client.js';
 import { normalizeFinance, billsAt, loanAt, installmentAt, entriesAt, portfolioAt, lisAt, budgetAt, sum } from './finance-model.js';
 
@@ -182,7 +183,7 @@ function seedState() {
   };
 }
 
-let state = normalizeFinance(load(), monthKey());
+let state = hub.normalizeHub(normalizeFinance(load(), monthKey()));
 
 function load() {
   try {
@@ -220,7 +221,7 @@ export async function setCloudUser(userId) {
   const { data: row, error } = await sb.from('app_state').select('data').eq('user_id', userId).maybeSingle();
   if (error) { syncStatus = 'error'; throw error; }
   if (row && row.data) {
-    state = normalizeFinance(row.data, monthKey());
+    state = hub.normalizeHub(normalizeFinance(row.data, monthKey()));
     persist(state);
     cloudReady = true; syncStatus = 'ready';
   } else {
@@ -256,7 +257,7 @@ export function save() {
 }
 
 export function resetApp() {
-  state = normalizeFinance(seedState(), monthKey());
+  state = hub.normalizeHub(normalizeFinance(seedState(), monthKey()));
   save();
 }
 
@@ -271,7 +272,7 @@ export function importData(jsonString) {
   if (!parsed || typeof parsed !== 'object' || !parsed.finance || !parsed.goalsByYear) {
     throw new Error('Arquivo não parece ser um backup válido do Forja.');
   }
-  state = normalizeFinance(parsed, monthKey());
+  state = hub.normalizeHub(normalizeFinance(parsed, monthKey()));
   save();
 }
 
@@ -917,4 +918,63 @@ export function monthlySpendingPlan(ym = selectedFinanceMonth()) {
   return { ...analysis, cardExpenses,
     investmentPotential: Math.max(0, sum([analysis.income, -analysis.expenses])),
     investmentShortfall: Math.max(0, sum([analysis.expenses, analysis.invested, -analysis.income, -analysis.redeemed])) };
+}
+
+// ---------- treinos, biblioteca e negócios ----------
+export function trainingSummary(date=todayISO()) { return hub.trainingSummary(state,date); }
+export function saveTrainingSession(input,id) {
+  const data=hub.trainingInput(input,todayISO());
+  const entry=id?state.trainingSessions.find(e=>e.id===id):null;
+  if(id&&!entry)throw new Error('Treino não encontrado.');
+  if(entry)Object.assign(entry,data);else state.trainingSessions.push({...data,id:uid('training'),createdAt:new Date().toISOString()});
+  save();
+}
+export function removeTrainingSession(id) { state.trainingSessions=state.trainingSessions.filter(e=>e.id!==id);save(); }
+export function setWeeklyTrainingGoal(value) {
+  if(!Number.isInteger(value)||value<1||value>21)throw new Error('Escolha uma meta de 1 a 21 treinos por semana.');
+  state.weeklyTrainingGoal=value;save();
+}
+export function saveBook(input,id) {
+  const data=hub.bookInput(input),book=id?state.books.find(b=>b.id===id):null;
+  if(id&&!book)throw new Error('Livro não encontrado.');
+  if(book)Object.assign(book,data);else state.books.push({...data,id:uid('book')});
+  save();
+}
+export function removeBook(id) { state.books=state.books.filter(b=>b.id!==id);save(); }
+export function registerReading(input) {
+  const data=hub.readingInput(state,input,todayISO()),book=state.books.find(b=>b.id===data.bookId);
+  const latest=state.readingSessions.filter(e=>e.bookId===book.id).map(e=>e.date).sort().at(-1);
+  if(!latest||data.date>=latest) {
+    book.pageCurrent=data.page;
+    book.status=book.pageTotal&&data.page===book.pageTotal?'finished':'reading';
+  }
+  state.readingSessions.push({...data,id:uid('reading'),bookTitle:book.title,createdAt:new Date().toISOString()});
+  state.readingLog[data.date]=(state.readingLog[data.date]||0)+data.minutes;
+  save();
+}
+export function removeReadingSession(id) {
+  const session=state.readingSessions.find(e=>e.id===id);if(!session)return;
+  state.readingLog[session.date]=Math.max(0,(state.readingLog[session.date]||0)-session.minutes);
+  state.readingSessions=state.readingSessions.filter(e=>e.id!==id);save();
+}
+export function businessSummary(ym=monthKey(),businessId='all') { return hub.businessSummary(state,ym,businessId); }
+export function saveBusinessEntry(input,id) {
+  const data=hub.businessEntryInput(state,input,todayISO()),entry=id?state.businessEntries.find(e=>e.id===id):null;
+  if(id&&!entry)throw new Error('Lançamento não encontrado.');
+  if(entry)Object.assign(entry,data);else state.businessEntries.push({...data,id:uid('business-entry')});save();
+}
+export function removeBusinessEntry(id) { state.businessEntries=state.businessEntries.filter(e=>e.id!==id);save(); }
+export function saveBusinessClient(input,id) {
+  const data=hub.clientInput(state,input),client=id?state.businessClients.find(e=>e.id===id):null;
+  if(id&&!client)throw new Error('Cliente não encontrado.');
+  if(client&&client.businessId!==data.businessId&&state.businessEntries.some(e=>e.clientId===id))throw new Error('Este cliente tem lançamentos. Cadastre outro cliente na empresa de destino.');
+  if(client)Object.assign(client,data);else state.businessClients.push({...data,id:uid('client')});save();
+}
+export function removeBusinessClient(id) {
+  state.businessClients=state.businessClients.filter(e=>e.id!==id);
+  state.businessEntries.forEach(e=>{if(e.clientId===id)e.clientId='';});save();
+}
+export function setBusinessGoal(businessId,ym,amount) {
+  if(!state.businesses.some(b=>b.id===businessId)||!/^\d{4}-(0[1-9]|1[0-2])$/.test(ym)||!Number.isFinite(amount)||amount<0)throw new Error('Informe uma meta mensal válida.');
+  state.businessGoals[`${businessId}:${ym}`]=Math.round(amount*100)/100;save();
 }

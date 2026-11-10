@@ -1,114 +1,20 @@
 import { icon } from '../icons.js';
-import {
-  todayISO, dayProgress, currentStreak, currentBlock, nextBlocks,
-  socialLockActive, formatDateLong, isBlockDone, todaysBlocks, financialSummary, formatMoney,
-} from '../store.js';
-
-function blockEndDate(block, now) {
-  const [h, m] = block.end.split(':').map(Number);
-  const d = new Date(now);
-  d.setHours(h, m, 0, 0);
-  return d;
-}
-
-function remainingLabel(block, now) {
-  const end = blockEndDate(block, now);
-  let diffMin = Math.round((end - now) / 60000);
-  if (diffMin < 0) diffMin = 0;
-  const h = Math.floor(diffMin / 60);
-  const m = diffMin % 60;
-  return h > 0 ? `${h}h ${m}min` : `${m}min`;
-}
-
+import * as store from '../store.js';
+import { escapeHTML as esc } from '../ui.js';
 export function render(state) {
-  const now = new Date();
-  const iso = todayISO(now);
-  const { done, total, pct } = dayProgress(iso, now);
-  const streak = currentStreak(now);
-  const block = currentBlock(now);
-  const upcoming = nextBlocks(2, now);
-  const locked = socialLockActive(now);
-  const finances = financialSummary();
-
-  const treinoBlocks = todaysBlocks(now).filter((b) => b.type === 'treino');
-  const treinoDone = treinoBlocks.length > 0 && treinoBlocks.every((b) => isBlockDone(iso, b.id));
-  const treinoStatus = treinoBlocks.length === 0 ? 'Descanso' : (treinoDone ? 'Feito' : 'Pendente');
-  const treinoColor = treinoBlocks.length === 0 ? 'muted' : (treinoDone ? 'green' : 'dim');
-
-  const estudoBlock = todaysBlocks(now).find((b) => b.type === 'estudo');
-  const estudoDone = estudoBlock ? isBlockDone(iso, estudoBlock.id) : false;
-
-  return `
-    <div class="row">
-      <div class="muted" style="font-size:13px;">${formatDateLong(now)}</div>
-      <div class="row gap-8">
-        <div class="row gap-8" style="background:var(--ember-bg);border:1px solid var(--ember-border);border-radius:20px;padding:6px 12px;">
-          <span style="width:15px;height:15px;color:var(--ember);display:flex;">${icon.flame()}</span>
-          <span class="fjc" style="font-size:14px;font-weight:700;color:var(--ember);">${streak}</span>
-        </div>
-        <a href="#/config" style="width:18px;height:18px;color:var(--text-dim-2);display:flex;">${icon.gear()}</a>
-      </div>
-    </div>
-
-    <section class="welcome-hero"><div class="eyebrow">Um dia de cada vez</div><h1>Seu próximo passo<br>começa aqui.</h1><p class="page-description">${done === total && total > 0 ? 'Você concluiu os blocos de hoje. Reconheça seu progresso.' : 'Organize o dia e avance no que importa para você.'}</p></section>
-
-    <a href="#/rotina" class="card" style="display:block;">
-      <div class="row" style="margin-bottom:12px;align-items:baseline;">
-        <span class="section-label" style="margin:0;">Progresso</span>
-        <span class="fjc" style="font-size:13px;font-weight:700;color:var(--ember);">${done} / ${total} blocos</span>
-      </div>
-      <div class="progress-track"><div class="progress-fill" style="width:${Math.round(pct * 100)}%;"></div></div>
-    </a>
-
-    <div class="grid-3">
-      <a href="#/treino" class="card card-tight stack gap-8" style="text-decoration:none;color:inherit;">
-        <span style="width:18px;height:18px;color:var(--${treinoColor === 'green' ? 'green' : 'text-dim-2'});display:flex;">${icon.dumbbell()}</span>
-        <span style="font-size:11.5px;color:var(--text-dim);">Treino</span>
-        <span style="font-size:12.5px;font-weight:700;${treinoColor === 'green' ? 'color:var(--green);' : ''}">${treinoStatus}</span>
-      </a>
-      <a href="#/estudos" class="card card-tight stack gap-8" style="text-decoration:none;color:inherit;">
-        <span style="width:18px;height:18px;color:var(--text-dim-2);display:flex;">${icon.book()}</span>
-        <span style="font-size:11.5px;color:var(--text-dim);">Estudo</span>
-        <span style="font-size:12.5px;font-weight:700;${estudoDone ? 'color:var(--green);' : ''}">${estudoDone ? 'Feito' : 'Pendente'}</span>
-      </a>
-      <a href="#/bloqueio" class="card card-tight stack gap-8" style="text-decoration:none;color:inherit;border-color:${locked ? 'var(--red-border)' : 'var(--border)'};background:${locked ? 'var(--red-bg)' : 'var(--surface)'};">
-        <span style="width:18px;height:18px;color:${locked ? 'var(--red)' : 'var(--green)'};display:flex;">${icon.lock()}</span>
-        <span style="font-size:11.5px;color:var(--text-dim);">Redes</span>
-        <span style="font-size:12.5px;font-weight:700;color:${locked ? 'var(--red)' : 'var(--green)'};">${locked ? 'Foco ativo' : 'Janela livre'}</span>
-      </a>
-    </div>
-
-    ${block ? `
-      <div class="card" style="border-color:var(--cyan);">
-        <div class="row gap-8" style="margin-bottom:10px;">
-          <span style="width:7px;height:7px;border-radius:50%;background:var(--cyan);"></span>
-          <span class="section-label" style="margin:0;color:oklch(0.7 0.1 200);">Agora</span>
-        </div>
-        <div class="fjc" style="font-size:17px;font-weight:700;margin-bottom:4px;">${block.start} – ${block.end} · ${block.title}</div>
-        <div class="muted" style="font-size:13px;margin-bottom:14px;">${block.type === 'foco' ? 'Período reservado para foco. Acompanhe sua rotina no Forja.' : ''}</div>
-        <div class="row">
-          <span class="muted" style="font-size:13px;">Restam</span>
-          <span class="fjc" style="font-size:20px;font-weight:700;color:var(--cyan);">${remainingLabel(block, now)}</span>
-        </div>
-      </div>
-    ` : ''}
-
-    ${upcoming.length ? `
-      <div>
-        <div class="section-label">Próximos blocos</div>
-        <div class="stack" style="border-radius:10px;overflow:hidden;border:1px solid var(--border);">
-          ${upcoming.map((b) => `
-            <a href="#/rotina" class="row" style="color:inherit;background:var(--surface);padding:13px 16px;border-bottom:1px solid var(--border);">
-              <div class="stack">
-                <span style="font-size:14px;font-weight:600;${b.type === 'livre' ? 'color:var(--red);' : ''}">${b.title}</span>
-                <span class="muted" style="font-size:12px;">${b.start} – ${b.end}</span>
-              </div>
-              <span style="width:16px;height:16px;color:var(--text-dim-2);display:flex;">${icon.chevronRight()}</span>
-            </a>
-          `).join('')}
-        </div>
-      </div>
-    ` : ''}
-    <a href="#/financeiro" class="card row" style="color:inherit;gap:16px"><div><div class="section-label">Seu mês em perspectiva</div><div class="fjc" style="font-size:24px;color:${finances.balance < 0 ? 'var(--red)' : 'var(--ember)'}">${formatMoney(finances.balance)}</div><p class="hint">Disponível na conta · após despesas e investimentos</p></div>${icon.chevronRight()}</a>
-  `;
+  const now=new Date(),today=store.todayISO(now),month=store.monthKey(now),progress=store.dayProgress(today,now);
+  const pending=store.todaysBlocks(now).filter(b=>b.type!=='livre'&&!store.isBlockDone(today,b.id));
+  const time=now.toTimeString().slice(0,5);
+  const current=store.currentBlock(now),focus=current&&current.type!=='livre'&&!store.isBlockDone(today,current.id)?current:pending.find(b=>b.start>=time)||pending[0];
+  const plan=store.monthlySpendingPlan(month),training=store.trainingSummary(today),minutes=state.readingLog[today]||0;
+  const reading=state.books.filter(b=>b.status==='reading'),business=store.businessSummary(month);
+  const nextTraining=state.trainingSessions.filter(e=>e.status==='planned'&&e.date>=today).sort((a,b)=>a.date.localeCompare(b.date))[0];
+  return `<header class="hub-heading home-heading"><div class="hub-section-title"><span class="eyebrow">Seu ponto de partida</span><a href="#/menu" class="icon-button" aria-label="Abrir menu geral">${icon.more()}</a></div><h1>Seu dia, em foco.</h1><p>${store.formatDateLong(now)}</p></header>
+    <section class="card hub-hero home-focus"><div class="hub-section-title"><span class="section-label">${focus?(focus===current?'Agora':focus.start>=time?'A seguir':'Pendente hoje'):'Sua agenda de hoje'}</span><span class="pill pill-green">${progress.done}/${progress.total} feitos</span></div><h2>${focus?esc(focus.title):progress.total?'Tudo concluído por hoje':'Organize o que importa para hoje'}</h2><p>${focus?`${focus.start}–${focus.end} · ${focus===current?'em andamento':'na sua rotina'}`:'Reserve tempo para cuidar de você e dos seus projetos.'}</p><div class="progress-track"><div class="progress-fill" style="width:${Math.round(progress.pct*100)}%"></div></div><div class="hub-actions">${focus?`<button class="btn btn-primary" data-action="toggleBlock" data-date="${today}" data-id="${focus.id}">Concluir tarefa</button>`:''}<a href="#/rotina" class="btn-ghost">Abrir rotina →</a></div></section>
+    <div class="home-shortcuts"><a href="#/treino">${icon.dumbbell()}<span>Registrar treino</span></a><a href="#/estudos">${icon.book()}<span>Registrar leitura</span></a><a href="#/negocios">${icon.business()}<span>Seus negócios</span></a></div>
+    <section class="hub-section"><div class="hub-section-title"><h2>Seu dinheiro, com clareza</h2><a href="#/financeiro" class="btn-link">Financeiro →</a></div><a href="#/financeiro" class="card home-finance"><div><span class="section-label">${plan.income===0?'Planejamento do mês':plan.headroom<0?'Acima do teto de gastos':'Margem até o teto de 80%'}</span><strong class="hub-number ${plan.income>0&&plan.headroom<0?'negative':''}">${plan.income===0?'Informe sua renda':store.formatMoney(Math.abs(plan.headroom))}</strong><p class="hint">${plan.income===0?'Cadastre as entradas para acompanhar o orçamento.':'Margem de gastos do mês, independente do dinheiro que você já investiu.'}</p></div><div class="home-finance-foot"><span>Faturas previstas <b>${store.formatMoney(plan.cardExpenses)}</b></span><span>Patrimônio previsto <b>${store.formatMoney(plan.projectedAssets)}</b></span></div></a></section>
+    <div class="home-two-columns"><section class="card hub-section"><div class="hub-section-title"><h2>Movimento</h2><span class="hub-icon">${icon.dumbbell()}</span></div><div class="hub-number">${training.done}<span> / ${state.weeklyTrainingGoal} na semana</span></div><p class="hint">${training.minutes} min registrados · ${training.distance.toLocaleString('pt-BR')} km de pedal</p><p>${nextTraining?`Próximo planejado: ${nextTraining.date.split('-').reverse().join('/')}`:'Jiu-jitsu, pedal ou uma sessão em casa.'}</p><a href="#/treino" class="btn-link">Cuidar do corpo →</a></section>
+    <section class="card hub-section"><div class="hub-section-title"><h2>Conhecimento</h2><span class="hub-icon">${icon.book()}</span></div><div class="hub-number">${minutes}<span> / ${state.dailyReadingGoalMin} min hoje</span></div><p class="hint">${reading.length} livro(s) em leitura</p>${reading.slice(0,2).map(b=>`<p class="home-book-title">${esc(b.title)} <small>pág. ${b.pageCurrent}${b.pageTotal?'/'+b.pageTotal:''}</small></p>`).join('')}<a href="#/estudos" class="btn-link">Continuar aprendendo →</a></section></div>
+    <section class="hub-section"><div class="hub-section-title"><h2>Seus negócios</h2><a href="#/negocios" class="btn-link">Painel completo →</a></div><div class="home-business-total"><span>Faturamento do mês <strong>${store.formatMoney(business.revenue)}</strong></span><span>A receber <strong>${store.formatMoney(business.receivable)}</strong></span></div><div class="stack gap-8">${state.businesses.map((b,i)=>{const s=store.businessSummary(month,b.id);return `<a class="card home-company-row" href="#/negocios"><span class="hub-company-mark mark-${i%3}">${esc(b.name[0])}</span><span><strong>${esc(b.name)}</strong><small>${s.clients} cliente(s) ativo(s) · ${s.entries?'resultado '+store.formatMoney(s.result):'sem lançamentos no mês'}</small></span><span class="home-company-value">${store.formatMoney(s.revenue)}</span></a>`;}).join('')}</div></section>
+    <section class="hub-section"><div class="hub-section-title"><h2>Na agenda de hoje</h2><a href="#/rotina" class="btn-link">Ver tudo →</a></div><div class="stack gap-8">${pending.slice(0,4).map(b=>`<button class="check-row home-task" data-action="toggleBlock" data-date="${today}" data-id="${b.id}"><span class="check">${icon.check()}</span><span><strong>${esc(b.title)}</strong><small>${b.start}–${b.end}</small></span><span class="hint">Concluir</span></button>`).join('')||'<div class="card"><p class="hint">Nenhuma tarefa pendente na agenda de hoje.</p></div>'}</div></section>`;
 }

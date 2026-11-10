@@ -3,6 +3,9 @@ import * as store from './store.js';
 import { icon } from './icons.js';
 
 import * as viewHome from './views/home.js';
+import * as viewMenu from './views/menu.js';
+import * as viewNegocios from './views/negocios.js';
+import * as viewTreinoPlano from './views/treino-plano.js';
 import * as viewRotina from './views/rotina.js';
 import * as viewBloqueio from './views/bloqueio.js';
 import * as viewTreino from './views/treino.js';
@@ -28,6 +31,9 @@ import { closeForms as closeFinanceiroForms } from './views/financeiro.js';
 registerRoute('/financeiro/receita', viewReceita);
 registerRoute('/financeiro/investimentos', viewInvestimentos);
 registerRoute('/home', viewHome);
+registerRoute('/menu', viewMenu);
+registerRoute('/negocios', viewNegocios);
+registerRoute('/treino/plano', viewTreinoPlano);
 registerRoute('/rotina', viewRotina);
 registerRoute('/bloqueio', viewBloqueio);
 registerRoute('/treino', viewTreino);
@@ -44,16 +50,14 @@ registerRoute('/config', viewConfig);
 const NAV_ITEMS = [
   { path: '/home', label: 'Início', icon: icon.home },
   { path: '/rotina', label: 'Rotina', icon: icon.clock },
-  { path: '/treino', label: 'Treino', icon: icon.dumbbell },
-  { path: '/estudos', label: 'Estudos', icon: icon.book },
-  { path: '/metas', label: 'Metas', icon: icon.target },
   { path: '/financeiro', label: 'Financeiro', icon: icon.wallet },
+  { path: '/negocios', label: 'Negócios', icon: icon.business },
+  { path: '/menu', label: 'Menu', icon: icon.more },
 ];
-
-const NO_NAV_ROUTES = new Set([
-  '/bloqueio', '/treino/verificacao', '/financeiro/pagamentos',
-  '/financeiro/lancar', '/financeiro/cartoes', '/financeiro/emprestimos', '/financeiro/receita', '/config',
-]);
+const NO_NAV_ROUTES = new Set(['/bloqueio','/treino/verificacao']);
+function navActive(item,path) {
+  return item.path==='/menu' ? !NAV_ITEMS.filter(i=>i.path!=='/menu').some(i=>path===i.path||path.startsWith(i.path+'/')) : path===item.path||path.startsWith(item.path+'/');
+}
 
 const viewEl = document.getElementById('view');
 const navEl = document.getElementById('navbar');
@@ -66,7 +70,7 @@ function renderNav(path) {
   }
   navEl.style.display = '';
   navEl.innerHTML = NAV_ITEMS.map((item) => `
-    <a href="#${item.path}" aria-label="${item.label}" ${path === item.path || path.startsWith(item.path + '/') ? 'aria-current="page"' : ''} class="${(path === item.path || path.startsWith(item.path + '/')) ? 'active' : ''}">
+    <a href="#${item.path}" aria-label="${item.label}" ${navActive(item,path) ? 'aria-current="page"' : ''} class="${navActive(item,path) ? 'active' : ''}">
       ${item.icon()}
       <span>${item.label}</span>
     </a>
