@@ -594,3 +594,37 @@ h2 { font-size: 17px; font-weight: 700; }
   .care-guide li { flex-direction:column; gap:6px; }
 }
 @media (prefers-reduced-motion:reduce) { .care-timer.running .care-orbit { animation:none; } }
+
+/* ---------- cursos com check diário ---------- */
+.course-math-preset { display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+.course-math-preset strong { font-size:15px; }
+.course-math-preset p { margin:8px 0 0; }
+.course-simple-grid { align-items:start; }
+.course-simple-card { min-width:0; }
+.course-simple-card h2 { overflow-wrap:anywhere; }
+.course-simple-card [data-course-today] { display:flex; align-items:center; justify-content:center; gap:10px; min-height:52px; }
+.course-check-symbol { display:inline-flex; width:22px; height:22px; align-items:center; justify-content:center; font-size:23px; }
+.course-check-symbol svg { width:22px; height:22px; }
+.course-checked-today:disabled { background:var(--ember-bg); border:1px solid var(--ember-border); color:var(--ember); opacity:1; cursor:default; }
+.course-undo-today { align-self:center; margin-top:-6px; font-size:11px; }
+.course-module-progress { display:flex; flex-direction:column; gap:12px; margin-top:4px; }
+.course-module-progress .hub-section-title { font-size:12px; }
+.course-module-progress .hub-section-title > span { color:var(--text-dim); }
+.course-modules { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:8px; margin-top:16px; margin-bottom:12px; }
+.course-module { padding:10px 4px; border:1px solid var(--border); background:var(--surface-2); border-radius:10px; display:flex; flex-direction:column; align-items:center; gap:6px; }
+.course-module b { font:500 18px 'Space Grotesk',sans-serif; }
+.course-module small { font-size:9px; color:var(--text-dim); }
+.course-module.done { background:var(--ember-bg); color:var(--ember); border-color:var(--ember-border); }
+.course-module.current { border-color:var(--ember); }
+.course-recent-days { display:flex; flex-direction:column; gap:12px; padding-top:14px; border-top:1px solid var(--border); }
+.course-recent-days > div { display:flex; gap:7px; flex-wrap:wrap; }
+.course-recent-days .pill { font-size:10px; }
+.course-day-list { margin-top:12px; max-height:300px; overflow:auto; }
+.course-day-list > div { display:flex; justify-content:space-between; align-items:baseline; gap:14px; padding:12px 0; border-bottom:1px solid var(--border); font-size:12px; }
+.course-day-list strong { flex-shrink:0; font-size:11px; }
+.course-day-list span { overflow-wrap:anywhere; text-align:right; color:var(--text-dim); line-height:1.8; }
+.course-calendar .reading-calendar-day { min-height:58px; }
+@media (max-width:640px) { .course-modules { gap:5px; } .course-module { padding:10px 3px; } }
+.course-today-summary { gap:8px; }
+.course-today-summary .section-label { margin:0; }
+.course-today-summary p { margin:0; }

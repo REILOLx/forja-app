@@ -19,6 +19,7 @@ export function normalizeHub(s) {
   s.studyTrack ||= {title:'Sua trilha de estudo',module:0,totalModules:1,nextTopic:''};
   if(!Array.isArray(s.studyCourses))s.studyCourses=[{...s.studyTrack,id:'course-migrated-track',provider:'',status:'active',legacyTrack:true}];
   s.learningEntries ||= [];
+  s.courseCheckins ||= [];
   if (!Array.isArray(s.books)) {
     s.books = [];
     if (s.currentBook?.title) s.books.push({ ...s.currentBook, id:'book-migrated-current', status:'reading' });
@@ -114,7 +115,12 @@ export function courseInput(input) {
   let module=number(input.module||0,0,true);
   if(totalModules&&module>totalModules)throw new Error('Os módulos concluídos não podem ultrapassar o total.');
   if(status==='completed'&&totalModules)module=totalModules;
-  return {title,provider,status,module,totalModules,nextTopic:text(input.nextTopic,200)};
+  let sourceUrl=text(input.sourceUrl,2048);
+  if(sourceUrl){
+    try{const url=new URL(sourceUrl);if(!['http:','https:'].includes(url.protocol)||url.username||url.password)throw new Error();sourceUrl=url.href;}
+    catch{throw new Error('Use um link http ou https válido para o curso.');}
+  }
+  return {title,provider,status,module,totalModules,nextTopic:text(input.nextTopic,200),sourceUrl};
 }
 export function learningInput(s,input,today) {
   const course=s.studyCourses.find(c=>c.id===input.courseId),topic=text(input.topic,180),summary=text(input.summary,4000);
@@ -132,8 +138,20 @@ export function learningInput(s,input,today) {
     minutes:number(input.minutes||0,0,true),materialTitle:text(input.materialTitle,200),materialUrl,
     application:text(input.application,2000),questions:text(input.questions,1600),nextStep:text(input.nextStep,1000)};
 }
+// Dias com anotações antigas também contam como estudo, sem criar checks ou duplicar datas.
+export function courseStudyDays(s,courseId='all',month,today) {
+  const days=new Map(),matches=e=>(courseId==='all'||e.courseId===courseId)&&(!month||e.date.slice(0,7)===month)&&(!today||e.date<=today);
+  for(const entry of s.learningEntries.filter(matches)){
+    const day=days.get(entry.date)||{date:entry.date,checkin:false,entries:0};day.entries++;days.set(entry.date,day);
+  }
+  for(const entry of (s.courseCheckins||[]).filter(matches)){
+    const day=days.get(entry.date)||{date:entry.date,checkin:false,entries:0};day.checkin=true;days.set(entry.date,day);
+  }
+  return [...days.values()].sort((a,b)=>b.date.localeCompare(a.date));
+}
 export function courseSummary(s,courseId='all',month) {
   const entries=s.learningEntries.filter(e=>(courseId==='all'||e.courseId===courseId)&&(!month||e.date.slice(0,7)===month));
+  const days=courseStudyDays(s,courseId,month);
   return {entries:entries.length,minutes:entries.reduce((n,e)=>n+e.minutes,0),review:entries.filter(e=>e.status==='review').length,
-    days:new Set(entries.map(e=>e.date)).size,lastDate:entries.map(e=>e.date).sort().at(-1)||null};
+    days:days.length,lastDate:days[0]?.date||null};
 }

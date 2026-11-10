@@ -960,7 +960,7 @@ export function saveBook(input,id) {
 export function removeBook(id) {if(state.activeReadingTimer?.bookId===id)throw new Error('Conclua a sessão deste livro antes de removê-lo.');state.books=state.books.filter(b=>b.id!==id);save();}
 export function registerReading() {throw new Error('Os minutos são registrados somente pelo cronômetro de hoje.');}
 export function removeReadingSession() {throw new Error('Os registros de leitura são permanentes e não podem ser excluídos.');}
-function saveTimerState() {save();clearTimeout(pushTimer);if(cloudUserId&&cloudReady)void pushToCloudNow();}
+function saveImmediately() {save();clearTimeout(pushTimer);if(cloudUserId&&cloudReady)void pushToCloudNow();}
 export function readingDay(date=todayISO()) {return hub.readingDay(state,date,todayISO());}
 export function readingMonth(month=monthKey()) {return hub.readingMonth(state,month,todayISO());}
 export function readingHistory() {return hub.readingHistory(state,todayISO());}
@@ -968,7 +968,7 @@ export function expireReadingTimer() {
   const timer=state.activeReadingTimer;
   if(!timer||timer.date===todayISO()&&Date.now()<timer.endsAt)return false;
   if(!state.readingSessions.some(e=>e.id===timer.id))state.readingSessions.push({id:timer.id,source:'timer',status:'expired',bookId:timer.bookId,bookTitle:timer.bookTitle,date:timer.date,minutes:0,pagesRead:0,elapsedMs:0,createdAt:new Date().toISOString()});
-  state.activeReadingTimer=null;saveTimerState();return true;
+  state.activeReadingTimer=null;saveImmediately();return true;
 }
 export function startReadingTimer(bookId) {
   expireReadingTimer();
@@ -977,7 +977,7 @@ export function startReadingTimer(bookId) {
   if(!book||book.status==='finished')throw new Error('Selecione um livro em leitura, pausado ou na fila.');
   const now=new Date(),end=new Date(now.getFullYear(),now.getMonth(),now.getDate()+1).getTime();
   state.activeReadingTimer={id:uid('timed-reading'),bookId:book.id,bookTitle:book.title,date:todayISO(now),startedAt:now.getTime(),endsAt:end,stoppedAt:null,startPage:book.pageCurrent};
-  saveTimerState();
+  saveImmediately();
 }
 export function stopReadingTimer() {
   if(expireReadingTimer())throw new Error('O dia da sessão terminou. Não é possível registrar uma leitura de ontem.');
@@ -985,7 +985,7 @@ export function stopReadingTimer() {
   if(!timer)throw new Error('Inicie uma leitura primeiro.');
   if(timer.stoppedAt!==null)return;
   if(Date.now()-timer.startedAt<1000)throw new Error('O cronômetro precisa registrar pelo menos um segundo.');
-  timer.stoppedAt=Date.now();saveTimerState();
+  timer.stoppedAt=Date.now();saveImmediately();
 }
 export function completeReadingTimer(pagesRead) {
   if(expireReadingTimer())throw new Error('O dia terminou e o registro não pode ser preenchido retroativamente.');
@@ -1000,7 +1000,7 @@ export function completeReadingTimer(pagesRead) {
   state.readingSessions.push({...timer,source:'timer',status:'completed',elapsedMs,minutes,pagesRead,page,createdAt:new Date().toISOString()});
   state.readingLog[timer.date]=(Math.round((state.readingLog[timer.date]||0)*60)+seconds)/60;
   book.pageCurrent=page;book.status=book.pageTotal&&page===book.pageTotal?'finished':'reading';
-  state.activeReadingTimer=null;saveTimerState();
+  state.activeReadingTimer=null;saveImmediately();
 }
 export function businessSummary(ym=monthKey(),businessId='all') { return hub.businessSummary(state,ym,businessId); }
 export function saveBusinessEntry(input,id) {
@@ -1026,11 +1026,12 @@ export function setBusinessGoal(businessId,ym,amount) {
 
 // ---------- cursos e diário de aprendizados ----------
 export function saveStudyCourse(input,id) {
-  const data=hub.courseInput(input),course=id?state.studyCourses.find(c=>c.id===id):null;
+  const course=id?state.studyCourses.find(c=>c.id===id):null;
   if(id&&!course)throw new Error('Curso não encontrado.');
+  const data=hub.courseInput({...course,...input});
   if(course)Object.assign(course,data);else state.studyCourses.push({...data,id:uid('course'),createdAt:new Date().toISOString()});
   if(course?.legacyTrack)Object.assign(state.studyTrack,{title:course.title,module:course.module,totalModules:course.totalModules,nextTopic:course.nextTopic});
-  save();
+  saveImmediately();
 }
 export function saveLearningEntry(input,id) {
   const data=hub.learningInput(state,input,todayISO()),entry=id?state.learningEntries.find(e=>e.id===id):null;
@@ -1041,6 +1042,40 @@ export function saveLearningEntry(input,id) {
 }
 export function removeLearningEntry(id) {state.learningEntries=state.learningEntries.filter(e=>e.id!==id);save();}
 export function courseSummary(courseId='all',month) {return hub.courseSummary(state,courseId,month);}
+
+export function courseStudyDays(courseId='all',month) {return hub.courseStudyDays(state,courseId,month,todayISO());}
+function checkCourseToday(course) {
+  const date=todayISO();
+  if(hub.courseStudyDays(state,course.id,undefined,date).some(day=>day.date===date))return false;
+  state.courseCheckins.push({id:uid('course-check'),courseId:course.id,courseTitle:course.title,date,createdAt:new Date().toISOString()});
+  return true;
+}
+export function markCourseToday(courseId) {
+  const course=state.studyCourses.find(c=>c.id===courseId);
+  if(!course)throw new Error('Curso não encontrado.');
+  const added=checkCourseToday(course);if(added)saveImmediately();return added;
+}
+export function unmarkCourseToday(courseId) {
+  if(!state.studyCourses.some(c=>c.id===courseId))throw new Error('Curso não encontrado.');
+  // Somente o check de hoje pode ser desfeito. Anotações e dias anteriores são preservados.
+  state.courseCheckins=state.courseCheckins.filter(e=>e.courseId!==courseId||e.date!==todayISO());saveImmediately();
+}
+function syncLegacyCourse(course) {
+  if(course.legacyTrack)Object.assign(state.studyTrack,{title:course.title,module:course.module,totalModules:course.totalModules,nextTopic:course.nextTopic});
+}
+export function completeStudyModule(courseId) {
+  const course=state.studyCourses.find(c=>c.id===courseId);
+  if(!course)throw new Error('Curso não encontrado.');
+  if(!course.totalModules||course.module>=course.totalModules)throw new Error('Todos os módulos já foram concluídos ou o total ainda não foi definido.');
+  course.module++;if(course.module===course.totalModules)course.status='completed';
+  checkCourseToday(course);syncLegacyCourse(course);saveImmediately();
+}
+export function undoStudyModule(courseId) {
+  const course=state.studyCourses.find(c=>c.id===courseId);
+  if(!course||course.module<1)throw new Error('Não há módulo concluído para desfazer.');
+  course.module--;if(course.status==='completed')course.status='active';
+  syncLegacyCourse(course);saveImmediately();
+}
 
 
 // ---------- autocuidado ----------
@@ -1054,20 +1089,20 @@ export function startMeditation() {
   if(c.active)throw new Error('Conclua ou encerre a sessão em andamento primeiro.');
   const startedAt=Date.now();
   c.active={id:uid('meditation'),minutes:c.minutes,startedAt,endsAt:startedAt+c.minutes*60000,alertedAt:null};
-  saveTimerState();
+  saveImmediately();
 }
 export function markMeditationFinished() {
   const timer=state.selfCare.active;
   if(!timer||Date.now()<timer.endsAt||timer.alertedAt!==null)return false;
-  timer.alertedAt=Date.now();saveTimerState();return true;
+  timer.alertedAt=Date.now();saveImmediately();return true;
 }
 export function completeMeditation() {
   const c=state.selfCare,timer=c.active;
   if(!timer||Date.now()<timer.endsAt)throw new Error('Aguarde o fim do tempo para registrar a sessão completa.');
   if(!c.sessions.some(s=>s.id===timer.id))c.sessions.push({id:timer.id,minutes:timer.minutes,date:todayISO(new Date(timer.endsAt)),startedAt:timer.startedAt,endedAt:timer.endsAt,confirmedAt:Date.now()});
-  c.active=null;saveTimerState();
+  c.active=null;saveImmediately();
 }
-export function cancelMeditation() {state.selfCare.active=null;saveTimerState();}
+export function cancelMeditation() {state.selfCare.active=null;saveImmediately();}
 export function toggleSelfCareHabit(id) {
   const c=state.selfCare,habit=c.habits.find(h=>h.id===id);
   if(!habit||!habit.enabled)throw new Error('Cuidado não encontrado na rotina.');
