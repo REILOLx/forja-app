@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import {pathToFileURL} from 'node:url';
 import {resolve} from 'node:path';
-import {dailyReflection,REFLECTIONS,REFLECTION_SOURCES,reflectionPreferences} from '../js/reflections.js';
+import {dailyReflection,dailyReflections,REFLECTIONS,REFLECTION_SOURCES,PHILOSOPHER_SOURCES,REFLECTION_CATALOG_VERSION,normalizeReflectionPreferences,reflectionPreferences} from '../js/reflections.js';
 import {financialSnapshot,validateSnapshot,validateInsightResponse} from '../js/financial-insights-model.js';
 import {shiftMonth} from '../js/finance-model.js';
 import {createFinancialHandler} from '../supabase/functions/forja-insights/handler.js';
@@ -20,22 +20,34 @@ function mockServer(overrides={}) {
  return {handler,calls,req,env};
 }
 
-test('reflexão fica estável no dia, muda na virada e respeita todas as combinações de fontes',()=>{
- assert.equal(REFLECTIONS.length,28);assert.equal(new Set(REFLECTIONS.map(q=>q.id)).size,28);
- const keys=Object.keys(REFLECTION_SOURCES);
- for(let bits=1;bits<16;bits++){
-  const sources=keys.filter((_,i)=>bits&(1<<i));let previous=null;
+test('dois textos ficam estáveis no dia, mudam na virada e respeitam os autores selecionados',()=>{
+ assert.equal(REFLECTIONS.length,98);assert.equal(new Set(REFLECTIONS.map(q=>q.id)).size,98);
+ const keys=Object.keys(PHILOSOPHER_SOURCES),combinations=[keys,...keys.map(key=>[key]),['nietzsche','machiavelli'],['sartre','camus','beauvoir']];
+ assert.equal(keys.length,10);assert.equal(REFLECTIONS.filter(q=>q.source==='bible').length,28);
+ for(const sources of combinations){
+  let previousPhilosophy=null,previousBible=null;
   for(let n=0;n<400;n++){
-   const date=new Date(Date.UTC(2026,10,1+n)).toISOString().slice(0,10),q=dailyReflection(date,sources);
-   assert.ok(sources.includes(q.source));assert.equal(dailyReflection(date,sources).id,q.id);assert.notEqual(q.id,previous);previous=q.id;
+   const date=new Date(Date.UTC(2026,10,1+n)).toISOString().slice(0,10),pair=dailyReflections(date,sources);
+   assert.ok(sources.includes(pair.philosophical.source));assert.equal(pair.biblical.source,'bible');
+   assert.notEqual(pair.philosophical.id,pair.biblical.id);assert.deepEqual(dailyReflections(date,sources),pair);
+   assert.notEqual(pair.philosophical.id,previousPhilosophy);assert.notEqual(pair.biblical.id,previousBible);
+   previousPhilosophy=pair.philosophical.id;previousBible=pair.biblical.id;
   }
  }
- for(const q of REFLECTIONS){assert.match(q.url,/^https:\/\//);assert.ok(q.reference&&q.explanation&&q.practice);assert.ok(q.explanation.length<600);}
- assert.throws(()=>dailyReflection('2026-02-31'));assert.throws(()=>reflectionPreferences([]));assert.throws(()=>reflectionPreferences(['unknown']));
+ for(const q of REFLECTIONS){assert.match(q.url,/^https:\/\//);assert.ok(q.reference&&q.explanation&&q.practice&&q.theme);assert.ok(q.explanation.length<600);}
+ for(const q of REFLECTIONS.filter(q=>['sartre','camus','beauvoir','dostoevsky'].includes(q.source)))assert.match(q.version,/Paráfrase/);
+ assert.throws(()=>dailyReflection('2026-02-31'));assert.throws(()=>reflectionPreferences([]));assert.throws(()=>reflectionPreferences(['unknown']));assert.throws(()=>dailyReflections('2026-11-10',['bible']));
+});
+test('expansão adiciona autores aos cadastros anteriores uma vez e não reativa autores desmarcados',()=>{
+ const care={reflectionSources:['marcus','seneca','epictetus','bible']};normalizeReflectionPreferences(care);
+ for(const id of ['nietzsche','machiavelli','marcus','seneca','epictetus','sartre','camus','kierkegaard','beauvoir','dostoevsky'])assert.ok(care.reflectionSources.includes(id));
+ assert.equal(care.reflectionSources.includes('bible'),false);assert.equal(care.reflectionCatalogVersion,REFLECTION_CATALOG_VERSION);
+ care.reflectionSources=['nietzsche'];normalizeReflectionPreferences(care);assert.deepEqual(care.reflectionSources,['nietzsche']);
+ const pair=dailyReflections('2026-11-10',care.reflectionSources);assert.equal(pair.philosophical.source,'nietzsche');assert.equal(pair.biblical.source,'bible');
 });
 test('preferências de reflexão persistem sem alterar meditações nem histórico',()=>{
  store.resetApp();const before=structuredClone(store.getState().selfCare);
- store.setReflectionSources(['bible','seneca']);assert.deepEqual(store.getState().selfCare.reflectionSources,['seneca','bible']);
+ store.setReflectionSources(['bible','seneca']);assert.deepEqual(store.getState().selfCare.reflectionSources,['seneca']);
  const backup=store.exportData();store.importData(backup);assert.equal(store.exportData(),backup);assert.deepEqual(store.getState().selfCare.sessions,before.sessions);assert.equal(store.getState().selfCare.active,before.active);
  const unchanged=store.exportData();assert.throws(()=>store.setReflectionSources([]));assert.equal(store.exportData(),unchanged);
 });

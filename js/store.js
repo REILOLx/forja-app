@@ -1153,7 +1153,7 @@ export function toggleCareReminder(id) {
 }
 export function removeCareReminder(id) {state.selfCare.reminders=state.selfCare.reminders.filter(r=>r.id!==id);save();}
 
-export function setReflectionSources(sources) {state.selfCare.reflectionSources=hub.reflectionPreferences(sources);save();}
+export function setReflectionSources(sources) {state.selfCare.reflectionSources=hub.philosopherPreferences(sources);saveImmediately();}
 
 export function financialInsightSnapshot(ym=selectedFinanceMonth()) {
   const months=Array.from({length:12},(_,i)=>{const month=addMonths(ym,i),summary=financialSummary(month);return {month,income:summary.income,expenses:summary.expenses,invested:summary.invested,groups:expenseBreakdown(month).groups};});

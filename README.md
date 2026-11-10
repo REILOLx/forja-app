@@ -60,9 +60,11 @@ de teste; não acessa Supabase. `tests/mobile.html` contém uma janela de teste 
 
 ## Reflexões e insights financeiros
 
-- Autocuidado exibe uma reflexão diária com referência, explicação e aplicação prática.
-  As fontes sugeridas podem ser selecionadas no próprio card. O texto permanece no dia
-  e muda pela data local, inclusive ao retornar ao app após a meia-noite.
+- Autocuidado exibe duas reflexões diárias separadas: uma filosófica e uma bíblica,
+  ambas com referência, explicação e aplicação prática. O acervo tem 70 reflexões de
+  dez autores e 28 textos bíblicos. A seleção de autores vale para o bloco filosófico;
+  o bíblico aparece todos os dias. Os dois textos permanecem no dia e mudam pela data
+  local, inclusive ao retornar ao app após a meia-noite.
 - Financeiro → Insights mostra o teto, a margem ou o excesso e os 12 meses seguintes,
   com prioridades calculadas a partir das despesas cadastradas. Investimentos continuam
   separados dos gastos e parcelas obrigatórias permanecem provisionadas.

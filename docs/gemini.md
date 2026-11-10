@@ -64,10 +64,19 @@ handler. A consulta nunca altera lançamentos nem executa transações.
 
 ## Reflexões
 
-`js/reflections.js` reúne 28 traduções livres curtas, com referências e links para
-leitura no contexto, explicações próprias e uma aplicação. Não são citações geradas
-pelo Gemini. A escolha usa a data local e as fontes selecionadas; recarregar a tela
-não troca o texto e a virada do dia atualiza a reflexão. As sugestões iniciais são
-Marco Aurélio, Sêneca, Epicteto e Bíblia; isso não afirma conhecer preferências que
-estejam em outros chats. O acervo faz um ciclo de 28 dias com todas as fontes ativas;
-com menos fontes, o ciclo fica menor. Não promete 365 textos inéditos.
+`js/reflections.js` reúne 70 reflexões filosóficas e 28 bíblicas. Cada dia tem
+**dois blocos independentes**, um filosófico e um bíblico, ambos com referência,
+explicação e aplicação prática. Traduções livres de trechos e paráfrases são
+identificadas; uma paráfrase não é apresentada como citação literal.
+
+O acervo filosófico inclui Nietzsche, Maquiavel, Marco Aurélio, Sêneca, Epicteto,
+Camus, Sartre, Kierkegaard, Simone de Beauvoir e Dostoiévski. As correntes e o
+caráter literário de alguns textos são distinguidos. O usuário escolhe os autores;
+o bloco bíblico continua aparecendo independentemente dessa seleção.
+
+A escolha usa a data local. Reabrir não troca os textos e a virada do dia atualiza
+os dois. Com todos os dez autores ativos, o ciclo filosófico tem 70 dias; o bíblico
+faz um ciclo próprio de 28 dias. Com menos autores, o ciclo filosófico fica menor.
+A expansão é aplicada uma única vez ao cadastro anterior, sem reativar autores que
+o usuário desmarcar depois. Os textos não são gerados pelo Gemini e não dependem
+da disponibilidade da API.
