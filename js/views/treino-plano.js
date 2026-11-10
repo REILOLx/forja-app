@@ -81,6 +81,7 @@ export function render(state) {
       </div>
     </div>
 
+    <a href="#/treino/atividades" class="btn-ghost">Abrir registros de jiu-jitsu, pedal e treinos em casa →</a>
     <div>
       <div class="section-label">Plano da semana</div>
       <div class="stack gap-8">

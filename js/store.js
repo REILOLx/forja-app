@@ -184,6 +184,7 @@ function seedState() {
 }
 
 let state = hub.normalizeHub(normalizeFinance(load(), monthKey()));
+persist(state);
 
 function load() {
   try {
@@ -221,9 +222,11 @@ export async function setCloudUser(userId) {
   const { data: row, error } = await sb.from('app_state').select('data').eq('user_id', userId).maybeSingle();
   if (error) { syncStatus = 'error'; throw error; }
   if (row && row.data) {
+    const needsReadingMigration=!row.data.readingPlan;
     state = hub.normalizeHub(normalizeFinance(row.data, monthKey()));
     persist(state);
     cloudReady = true; syncStatus = 'ready';
+    if(needsReadingMigration)await pushToCloudNow();
   } else {
     cloudReady = true; syncStatus = 'ready';
     await pushToCloudNow();
@@ -560,6 +563,7 @@ export function updateCurrentBook(patch) {
 }
 
 export function setDailyReadingGoal(minutes) {
+  if(minutes!==state.readingPlan.dailyMinutes)throw new Error('A meta de leitura deste plano é de 20 minutos por dia.');
   state.dailyReadingGoalMin = minutes;
   save();
 }
@@ -582,14 +586,7 @@ export function startBookFromQueue(idx) {
   save();
 }
 
-export function logReading(dateISO, minutes) {
-  state.readingLog[dateISO] = (state.readingLog[dateISO] || 0) + minutes;
-  save();
-  if (state.readingLog[dateISO] >= state.dailyReadingGoalMin) {
-    const block = tasksForDate(dateISO).find((b) => b.type === 'estudo');
-    if (block && !isBlockDone(dateISO, block.id)) toggleBlockDone(dateISO, block.id);
-  }
-}
+export function logReading() {throw new Error('Use o cronômetro para registrar a leitura de hoje.');}
 
 // ---------- finance ----------
 export function cardInvoiceForMonth(cardId, ym = monthKey()) {
@@ -935,27 +932,56 @@ export function setWeeklyTrainingGoal(value) {
   state.weeklyTrainingGoal=value;save();
 }
 export function saveBook(input,id) {
+  if(id&&state.activeReadingTimer?.bookId===id)throw new Error('Conclua a sessão deste livro antes de editá-lo.');
   const data=hub.bookInput(input),book=id?state.books.find(b=>b.id===id):null;
   if(id&&!book)throw new Error('Livro não encontrado.');
   if(book)Object.assign(book,data);else state.books.push({...data,id:uid('book')});
   save();
 }
-export function removeBook(id) { state.books=state.books.filter(b=>b.id!==id);save(); }
-export function registerReading(input) {
-  const data=hub.readingInput(state,input,todayISO()),book=state.books.find(b=>b.id===data.bookId);
-  const latest=state.readingSessions.filter(e=>e.bookId===book.id).map(e=>e.date).sort().at(-1);
-  if(!latest||data.date>=latest) {
-    book.pageCurrent=data.page;
-    book.status=book.pageTotal&&data.page===book.pageTotal?'finished':'reading';
-  }
-  state.readingSessions.push({...data,id:uid('reading'),bookTitle:book.title,createdAt:new Date().toISOString()});
-  state.readingLog[data.date]=(state.readingLog[data.date]||0)+data.minutes;
-  save();
+export function removeBook(id) {if(state.activeReadingTimer?.bookId===id)throw new Error('Conclua a sessão deste livro antes de removê-lo.');state.books=state.books.filter(b=>b.id!==id);save();}
+export function registerReading() {throw new Error('Os minutos são registrados somente pelo cronômetro de hoje.');}
+export function removeReadingSession() {throw new Error('Os registros de leitura são permanentes e não podem ser excluídos.');}
+function saveReadingState() {save();clearTimeout(pushTimer);if(cloudUserId&&cloudReady)void pushToCloudNow();}
+export function readingDay(date=todayISO()) {return hub.readingDay(state,date,todayISO());}
+export function readingMonth(month=monthKey()) {return hub.readingMonth(state,month,todayISO());}
+export function readingHistory() {return hub.readingHistory(state,todayISO());}
+export function expireReadingTimer() {
+  const timer=state.activeReadingTimer;
+  if(!timer||timer.date===todayISO()&&Date.now()<timer.endsAt)return false;
+  if(!state.readingSessions.some(e=>e.id===timer.id))state.readingSessions.push({id:timer.id,source:'timer',status:'expired',bookId:timer.bookId,bookTitle:timer.bookTitle,date:timer.date,minutes:0,pagesRead:0,elapsedMs:0,createdAt:new Date().toISOString()});
+  state.activeReadingTimer=null;saveReadingState();return true;
 }
-export function removeReadingSession(id) {
-  const session=state.readingSessions.find(e=>e.id===id);if(!session)return;
-  state.readingLog[session.date]=Math.max(0,(state.readingLog[session.date]||0)-session.minutes);
-  state.readingSessions=state.readingSessions.filter(e=>e.id!==id);save();
+export function startReadingTimer(bookId) {
+  expireReadingTimer();
+  if(state.activeReadingTimer)throw new Error('Finalize a sessão em andamento antes de começar outra.');
+  const book=state.books.find(b=>b.id===bookId);
+  if(!book||book.status==='finished')throw new Error('Selecione um livro em leitura, pausado ou na fila.');
+  const now=new Date(),end=new Date(now.getFullYear(),now.getMonth(),now.getDate()+1).getTime();
+  state.activeReadingTimer={id:uid('timed-reading'),bookId:book.id,bookTitle:book.title,date:todayISO(now),startedAt:now.getTime(),endsAt:end,stoppedAt:null,startPage:book.pageCurrent};
+  saveReadingState();
+}
+export function stopReadingTimer() {
+  if(expireReadingTimer())throw new Error('O dia da sessão terminou. Não é possível registrar uma leitura de ontem.');
+  const timer=state.activeReadingTimer;
+  if(!timer)throw new Error('Inicie uma leitura primeiro.');
+  if(timer.stoppedAt!==null)return;
+  if(Date.now()-timer.startedAt<1000)throw new Error('O cronômetro precisa registrar pelo menos um segundo.');
+  timer.stoppedAt=Date.now();saveReadingState();
+}
+export function completeReadingTimer(pagesRead) {
+  if(expireReadingTimer())throw new Error('O dia terminou e o registro não pode ser preenchido retroativamente.');
+  const timer=state.activeReadingTimer;
+  if(!timer||timer.stoppedAt===null)throw new Error('Finalize o cronômetro antes de informar as páginas lidas.');
+  const book=state.books.find(b=>b.id===timer.bookId);
+  if(!book||!Number.isInteger(pagesRead)||pagesRead<0)throw new Error('Informe uma quantidade válida de páginas lidas.');
+  const page=timer.startPage+pagesRead;
+  if(book.pageTotal&&page>book.pageTotal)throw new Error('A quantidade ultrapassa as páginas restantes do livro.');
+  if(state.readingSessions.some(e=>e.id===timer.id))throw new Error('Esta sessão já foi registrada.');
+  const elapsedMs=hub.timerElapsed(timer),seconds=Math.floor(elapsedMs/1000),minutes=seconds/60;
+  state.readingSessions.push({...timer,source:'timer',status:'completed',elapsedMs,minutes,pagesRead,page,createdAt:new Date().toISOString()});
+  state.readingLog[timer.date]=(Math.round((state.readingLog[timer.date]||0)*60)+seconds)/60;
+  book.pageCurrent=page;book.status=book.pageTotal&&page===book.pageTotal?'finished':'reading';
+  state.activeReadingTimer=null;saveReadingState();
 }
 export function businessSummary(ym=monthKey(),businessId='all') { return hub.businessSummary(state,ym,businessId); }
 export function saveBusinessEntry(input,id) {

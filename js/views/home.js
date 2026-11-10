@@ -6,7 +6,7 @@ export function render(state) {
   const pending=store.todaysBlocks(now).filter(b=>b.type!=='livre'&&!store.isBlockDone(today,b.id));
   const time=now.toTimeString().slice(0,5);
   const current=store.currentBlock(now),focus=current&&current.type!=='livre'&&!store.isBlockDone(today,current.id)?current:pending.find(b=>b.start>=time)||pending[0];
-  const plan=store.monthlySpendingPlan(month),training=store.trainingSummary(today),minutes=state.readingLog[today]||0;
+  const plan=store.monthlySpendingPlan(month),training=store.trainingSummary(today),minutes=Math.floor(state.readingLog[today]||0);
   const reading=state.books.filter(b=>b.status==='reading'),business=store.businessSummary(month);
   const nextTraining=state.trainingSessions.filter(e=>e.status==='planned'&&e.date>=today).sort((a,b)=>a.date.localeCompare(b.date))[0];
   return `<header class="hub-heading home-heading"><div class="hub-section-title"><span class="eyebrow">Seu ponto de partida</span><a href="#/menu" class="icon-button" aria-label="Abrir menu geral">${icon.more()}</a></div><h1>Seu dia, em foco.</h1><p>${store.formatDateLong(now)}</p></header>

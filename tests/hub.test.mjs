@@ -20,23 +20,25 @@ test('migração de biblioteca é aditiva, idempotente e preserva fila, progress
  assert.deepEqual(s.businesses.map(b=>b.name),['LumeqIA','Alfa tauri innovation group','Reis e Reis construtora']);
  assert.equal(s.businessEntries.length,0);
 });
-test('duas leituras independentes somam minutos e mantêm páginas separadas',()=>{
+test('duas leituras cronometradas somam minutos e mantêm páginas separadas',t=>{
+ t.mock.timers.enable({apis:['Date'],now:new Date('2026-11-10T12:00:00Z').getTime()});
  clean();const today=store.todayISO(),s=store.getState();
  store.saveBook({title:'Livro A',author:'Autor',pageTotal:200,pageCurrent:0,status:'reading'});
  store.saveBook({title:'Livro B',pageTotal:300,pageCurrent:10,status:'reading'});
  const [a,b]=s.books.slice(-2);
- store.registerReading({bookId:a.id,date:today,minutes:20,page:30,notes:'Aprendizado A'});
- store.registerReading({bookId:b.id,date:today,minutes:15,page:25,notes:'Aprendizado B'});
+ store.startReadingTimer(a.id);t.mock.timers.tick(20*60000);store.stopReadingTimer();store.completeReadingTimer(30);
+ store.startReadingTimer(b.id);t.mock.timers.tick(15*60000);store.stopReadingTimer();store.completeReadingTimer(15);
  assert.equal(a.pageCurrent,30);assert.equal(b.pageCurrent,25);assert.equal(s.readingLog[today],35);
- assert.equal(s.books.filter(b=>b.status==='reading').length,3);
- assert.equal(s.readingSessions[0].notes,'Aprendizado A');
- store.registerReading({bookId:a.id,date:today,minutes:10,page:200});assert.equal(a.status,'finished');assert.equal(b.status,'reading');
- store.removeReadingSession(s.readingSessions[0].id);assert.equal(s.readingLog[today],25);assert.equal(s.books.find(book=>book.id===b.id).pageCurrent,25);
- store.removeBook(a.id);assert.equal(s.readingLog[today],25);assert.equal(s.readingSessions.length,2);
+ assert.equal(s.books.filter(b=>b.status==='reading').length,3);assert.equal(s.readingSessions[0].bookTitle,'Livro A');
+ store.startReadingTimer(a.id);t.mock.timers.tick(10*60000);store.stopReadingTimer();store.completeReadingTimer(170);
+ assert.equal(a.status,'finished');assert.equal(b.status,'reading');
+ assert.throws(()=>store.removeReadingSession(s.readingSessions[0].id));assert.equal(s.readingLog[today],45);
+ store.removeBook(a.id);assert.equal(s.readingLog[today],45);assert.equal(s.readingSessions.length,3);
 });
-test('leituras e livros inválidos não alteram o estado',()=>{
+test('registros manuais e livros inválidos não alteram o estado',()=>{
  clean();const book=store.getState().books[0],before=store.exportData();
- for(const invalid of [{minutes:0},{page:book.pageTotal+1},{date:'2026-02-30'},{bookId:'missing'}])assert.throws(()=>store.registerReading({bookId:book.id,date:store.todayISO(),minutes:20,page:20,...invalid}));
+ assert.throws(()=>store.registerReading({bookId:book.id,date:store.todayISO(),minutes:20,page:20}));
+ assert.throws(()=>store.logReading(store.todayISO(),20));assert.throws(()=>store.startReadingTimer('inexistente'));
  assert.throws(()=>store.saveBook({title:'',pageCurrent:0,pageTotal:100,status:'reading'}));
  assert.throws(()=>store.saveBook({title:'X',pageCurrent:200,pageTotal:100,status:'reading'}));
  assert.equal(store.exportData(),before);assert.equal(validDate('2026-02-30'),false);

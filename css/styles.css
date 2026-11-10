@@ -474,3 +474,32 @@ h2 { font-size: 17px; font-weight: 700; }
   .hub-type strong { font-size:12px; }
   .home-company-value { font-size:12px; }
 }
+
+/* Timed reading: today-only sessions and closed daily history. */
+.reading-timer-section { display:flex; flex-direction:column; gap:16px; }
+.reading-timer-section > form { margin-top:4px; }
+.reading-current-book { font-size:15px; font-weight:700; line-height:1.6; }
+.reading-clock { font:600 clamp(48px,10vw,76px)/1.1 'Space Grotesk',sans-serif; font-variant-numeric:tabular-nums; letter-spacing:-.05em; color:var(--ember); padding:8px 0; }
+.reading-clock-idle { color:var(--text-dim); }
+.english-study-card { border-color:#3b6258; }
+.english-study-card > h2 { font-size:22px; }
+.english-study-card > p { font-size:13px; line-height:1.6; }
+.english-study-card details { border-top:1px solid var(--border); padding-top:14px; }
+.reading-month-totals { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; }
+.reading-month-totals > span { font-size:11px; color:var(--text-dim); line-height:1.5; }
+.reading-month-totals b { display:block; font:600 17px 'Space Grotesk',sans-serif; color:var(--text); margin-top:8px; }
+.reading-calendar, .reading-calendar-week { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:6px; }
+.reading-calendar-week span { text-align:center; font-size:10px; color:var(--text-dim); }
+.reading-calendar-day { padding:10px 3px 5px; text-align:center; border:1px solid var(--border); background:var(--surface-2); border-radius:10px; display:flex; flex-direction:column; align-items:center; gap:5px; }
+.reading-calendar-day strong { font-size:13px; }
+.reading-calendar-day small { font-size:9px; white-space:nowrap; }
+.reading-calendar-day > span { font-size:14px; }
+.reading-calendar-day.reached { background:var(--ember-bg); border-color:var(--ember-border); color:var(--ember); }
+.reading-calendar-day.missed { background:var(--red-bg); border-color:var(--red-border); color:var(--red); }
+.reading-calendar-day.future { opacity:.45; }
+.reading-calendar-day.today { outline:1px solid var(--ember); outline-offset:2px; }
+.reading-legend { display:flex; flex-wrap:wrap; gap:8px 14px; font-size:10px; color:var(--text-dim); line-height:1.7; }
+.reading-history-row { display:flex; flex-direction:column; gap:10px; text-align:left; background:none; border:0; color:var(--text); padding:10px 0; }
+.reading-history-row .hub-section-title { font-size:12px; }
+.reading-history-row .progress-track { display:block; width:100%; }
+@media(max-width:420px) { .reading-month-totals { grid-template-columns:1fr; gap:10px; } .reading-month-totals > span { display:flex; justify-content:space-between; align-items:center; gap:12px; } .reading-month-totals b { margin:0; font-size:16px; } }

@@ -36,7 +36,8 @@ registerRoute('/negocios', viewNegocios);
 registerRoute('/treino/plano', viewTreinoPlano);
 registerRoute('/rotina', viewRotina);
 registerRoute('/bloqueio', viewBloqueio);
-registerRoute('/treino', viewTreino);
+registerRoute('/treino', viewTreinoPlano);
+registerRoute('/treino/atividades', viewTreino);
 registerRoute('/treino/verificacao', viewVerificacao);
 registerRoute('/metas', viewMetas);
 registerRoute('/estudos', viewEstudos);
@@ -79,8 +80,10 @@ function renderNav(path) {
 
 let authReady = false;
 let currentSession = null;
+let activeView = null;
 
 function render() {
+  activeView?.dispose?.(); activeView=null;
   if (!authReady) {
     viewEl.innerHTML = '<div class="muted" style="padding:60px 20px;text-align:center;">Carregando…</div>';
     navEl.innerHTML = '';
@@ -98,6 +101,7 @@ function render() {
 
   const path = currentPath();
   const mod = resolveRoute(path);
+  activeView=mod;
   document.getElementById('app-header').hidden = false;
   const previousPath = viewEl.dataset.path;
   const previousScroll = viewEl.scrollTop;
