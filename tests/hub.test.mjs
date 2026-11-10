@@ -119,3 +119,24 @@ test('cursos e aprendizados rejeitam valores inválidos e links inseguros antes 
  for(const invalid of [{courseId:'missing'},{date:'2099-01-01'},{date:'2026-02-30'},{topic:' '},{summary:''},{minutes:-1},{minutes:1.5},{status:'__proto__'},{materialUrl:'javascript:alert(1)'},{materialUrl:'data:application/pdf;base64,AAAA'},{materialUrl:'https://usuario:senha@example.test/pdf'}])assert.throws(()=>store.saveLearningEntry({...input,...invalid}));
  assert.equal(store.exportData(),before);
 });
+
+test('observações da meta preservam conclusão, progresso, outras metas e restauração por backup',()=>{
+ clean();const year=String(new Date().getFullYear()),s=store.getState(),area=store.getGoalsForYear(year)[0],item=area.keyResults[0];
+ const original=structuredClone(area),personal=structuredClone(s.finance);
+ store.updateKeyResultNotes(year,area.id,item.id,'  Meu motivo\n\nPlano de ação: treinar duas vezes por semana.  ');
+ assert.equal(item.notes,'Meu motivo\n\nPlano de ação: treinar duas vezes por semana.');
+ assert.equal(item.title,original.keyResults[0].title);assert.equal(item.done,original.keyResults[0].done);assert.deepEqual(area.keyResults.slice(1),original.keyResults.slice(1));
+ assert.equal(store.goalProgress(area),0);assert.deepEqual(s.finance,personal);
+ store.toggleKeyResult(year,area.id,item.id);const progress=store.goalProgress(area);
+ store.updateKeyResultNotes(year,area.id,item.id,'Nova observação');assert.equal(item.done,true);assert.equal(store.goalProgress(area),progress);
+ const backup=store.exportData();store.importData(backup);assert.equal(store.exportData(),backup);
+ const restored=store.getGoalsForYear(year)[0].keyResults[0];assert.equal(restored.notes,'Nova observação');assert.equal(restored.done,true);
+ store.updateKeyResultNotes(year,area.id,item.id,'');assert.equal(restored.notes,'');assert.equal(restored.done,true);
+});
+test('novas metas recebem detalhamento opcional e observações ficam isoladas por ano',()=>{
+ clean();const year=String(new Date().getFullYear()),next=String(Number(year)+1),area=store.getGoalsForYear(year)[0];
+ store.addKeyResult(year,area.id,'Minha meta','Meu plano detalhado');const current=area.keyResults.at(-1);assert.equal(current.notes,'Meu plano detalhado');assert.equal(current.done,false);
+ const otherArea=store.getGoalsForYear(next)[0];store.addKeyResult(next,otherArea.id,'Meta do próximo ano');const other=otherArea.keyResults.at(-1);other.id=current.id;
+ store.updateKeyResultNotes(next,otherArea.id,other.id,'Detalhe do próximo ano');assert.equal(other.notes,'Detalhe do próximo ano');assert.equal(current.notes,'Meu plano detalhado');
+ const before=store.exportData();assert.throws(()=>store.updateKeyResultNotes(year,area.id,'missing','Texto'));assert.throws(()=>store.updateKeyResultNotes('1900',area.id,current.id,'Texto'));assert.throws(()=>store.updateKeyResultNotes(year,area.id,current.id,'x'.repeat(6001)));assert.equal(store.exportData(),before);
+});

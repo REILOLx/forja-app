@@ -449,9 +449,26 @@ export function toggleKeyResult(year, goalId, krId) {
   save();
 }
 
-export function addKeyResult(year, goalId, title) {
+function goalNotes(notes) {
+  if(typeof notes !== 'string' || notes.length > 6000)throw new Error('As observações devem ter até 6.000 caracteres.');
+  return notes.trim();
+}
+
+export function addKeyResult(year, goalId, title, notes = '') {
+  const detail = goalNotes(notes);
+  if(typeof title !== 'string' || !title.trim())throw new Error('Informe o título da meta.');
   const goal = ensureYearGoals(year).find((g) => g.id === goalId);
-  goal.keyResults.push({ id: uid('kr'), title, done: false });
+  if(!goal)throw new Error('Área da meta não encontrada.');
+  goal.keyResults.push({ id: uid('kr'), title: title.trim(), notes: detail, done: false });
+  save();
+}
+
+export function updateKeyResultNotes(year, goalId, krId, notes) {
+  const detail = goalNotes(notes);
+  const goal = state.goalsByYear[year]?.find(g => g.id === goalId);
+  const result = goal?.keyResults.find(k => k.id === krId);
+  if(!result)throw new Error('Meta não encontrada.');
+  result.notes = detail;
   save();
 }
 
