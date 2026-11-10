@@ -208,6 +208,7 @@ let cloudUserId = null;
 let cloudReady = false;
 let syncStatus = 'local';
 export function cloudSyncStatus() { return syncStatus; }
+export function currentUserId() {return cloudUserId;}
 let pushTimer = null;
 
 // Chamado pelo app.js assim que o login resolve. Na primeira vez que este
@@ -1151,3 +1152,10 @@ export function toggleCareReminder(id) {
   r.done=!r.done;r.completedDate=r.done?todayISO():null;save();
 }
 export function removeCareReminder(id) {state.selfCare.reminders=state.selfCare.reminders.filter(r=>r.id!==id);save();}
+
+export function setReflectionSources(sources) {state.selfCare.reflectionSources=hub.reflectionPreferences(sources);save();}
+
+export function financialInsightSnapshot(ym=selectedFinanceMonth()) {
+  const months=Array.from({length:12},(_,i)=>{const month=addMonths(ym,i),summary=financialSummary(month);return {month,income:summary.income,expenses:summary.expenses,invested:summary.invested,groups:expenseBreakdown(month).groups};});
+  return hub.financialSnapshot(ym,todayISO(),months);
+}

@@ -1,4 +1,6 @@
+export { financialSnapshot } from './financial-insights-model.js';
 import { normalizeSelfCare } from './selfcare-model.js';
+export { reflectionPreferences } from './reflections.js';
 export { meditationSummary, reminderInput } from './selfcare-model.js';
 import { normalizeReading } from './reading-model.js';
 export { readingDay, readingMonth, readingHistory, readingMonthDays, timerElapsed, formatReadingSeconds, formatReadingClock } from './reading-model.js';

@@ -1,0 +1,5 @@
+project_id = "hmzourunlnbwduxfwoom"
+
+[functions.forja-insights]
+# A função valida o JWT chamando Auth.getUser no projeto, inclusive chaves novas.
+verify_jwt = false

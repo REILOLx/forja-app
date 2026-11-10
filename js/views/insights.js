@@ -1,0 +1,43 @@
+import * as store from '../store.js';
+import {requestFinancialInsights} from '../gemini-client.js';
+import {financeHeading,monthPicker,bindMonthPicker,monthLabel,escapeHTML as esc} from '../ui.js';
+let aiResult=null,resultSnapshot=null,resultOwner=null,busy=false,error='',revision=0;
+const money=cents=>store.formatMoney(cents/100);
+export function render() {
+  const snapshot=store.financialInsightSnapshot(),selected=snapshot.months[0],over=snapshot.months.filter(month=>month.status==='over'),key=JSON.stringify(snapshot);
+  if(resultSnapshot&&(resultSnapshot!==key||resultOwner!==store.currentUserId())){aiResult=null;resultSnapshot=null;}
+  return `${financeHeading('Insights financeiros','Entenda os meses apertados e decida onde rever seus gastos.')}${monthPicker()}
+    <section class="card hub-hero hub-section"><span class="section-label">${monthLabel(selected.month)} · teto de 80%</span><h2>${selected.status==='missing-income'?'Falta cadastrar a renda':selected.status==='over'?'Este mês pede um ajuste':'Seu planejamento está dentro do teto'}</h2><strong class="hub-number ${selected.status==='over'?'negative':'positive'}">${selected.status==='missing-income'?'Renda a informar':money(selected.status==='over'?selected.gapCents:selected.roomCents)}</strong><p class="hint">${selected.status==='missing-income'?'As despesas estão registradas, mas o teto depende das receitas deste mês.':selected.status==='over'?'Este é o valor que excede o teto no planejamento cadastrado. Veja abaixo o que pode ser revisto.':'Esta é a margem para novas despesas do mês. Ela não é saldo da conta nem limite do cartão.'}</p><div class="insight-totals"><span>Receitas<strong>${money(selected.incomeCents)}</strong></span><span>Teto de gastos<strong>${money(selected.ceilingCents)}</strong></span><span>Despesas<strong>${money(selected.expenseCents)}</strong></span></div><p class="hint">Aportes de ${money(selected.investedCents)} ficam fora dos gastos. Investir o que sobra não faz você ultrapassar o teto.</p></section>
+    <section class="card hub-section" id="gemini-analysis"><div class="hub-section-title"><h2>Uma leitura com Gemini</h2><span class="pill pill-dim">${aiResult?'Análise gerada':'Consulta sob demanda'}</span></div><p class="hint">Ao consultar, serão enviados ao Gemini apenas os números, categorias e principais descrições do seu financeiro pessoal para os 12 meses abaixo. Seus outros registros do app não entram na consulta.</p><button class="btn btn-primary" id="generate-gemini-insights" ${busy?'disabled':''}>${busy?'Analisando seus números…':aiResult?'Atualizar análise com Gemini':'Analisar com Gemini'}</button><p class="form-error" role="status" aria-live="polite" id="gemini-insights-error">${esc(error)}</p>${aiResult?renderAI(aiResult):'<p class="hint">Os cálculos e as prioridades abaixo são da própria Forja e funcionam mesmo sem a consulta à IA.</p>'}</section>
+    <section class="card hub-section"><span class="section-label">Leitura dos seus números · Forja</span><h2>Onde começar neste mês</h2>${localPriorities(selected)}<div class="hub-actions"><a href="#/financeiro/despesas" class="btn-link">Conferir cada despesa →</a><a href="#/financeiro" class="btn-link">Revisar lançamentos →</a></div></section>
+    <section class="hub-section"><div><h2>Seus próximos 12 meses</h2><p class="hint">${over.length} mês(es) acima do teto, com as receitas e os compromissos já cadastrados. Toque em um mês para examinar suas prioridades.</p></div><div class="insight-months">${snapshot.months.map(row=>`<button class="card insight-month ${row.status==='over'?'over':''}" data-insight-month="${row.month}" aria-label="Analisar ${monthLabel(row.month)}"><span>${monthLabel(row.month,true)}</span><strong class="${row.status==='over'?'negative':'positive'}">${row.status==='missing-income'?'Falta a renda':money(row.status==='over'?row.gapCents:row.roomCents)}</strong><small>${row.status==='missing-income'?'Cadastre as receitas':row.status==='over'?'acima do teto':'de margem no teto'}</small><small>Despesas: ${money(row.expenseCents)}</small></button>`).join('')}</div><p class="hint">Previsões mudam quando você atualiza receitas, faturas e compromissos. Uma fatura informada substitui as parcelas estimadas. Parcelas obrigatórias continuam provisionadas no mês da cobrança, mesmo antes da confirmação.</p></section>`;
+}
+function localPriorities(month) {
+  if(month.period==='past')return `<p>Este é um mês já encerrado. Os valores ajudam a identificar hábitos para os próximos meses; gastos reais e pagamentos feitos permanecem no histórico.</p><p class="hint">${month.status==='over'?'O fechamento ficou '+money(month.gapCents)+' acima do teto.':month.status==='within'?'O fechamento ficou dentro do teto.':'Cadastre a receita histórica para conferir o teto.'}</p>`;
+  if(month.status==='missing-income')return '<p>Cadastre o salário e as outras receitas previstas antes de avaliar o teto. Sem a renda, não há base para dizer quanto você precisa economizar.</p><a class="btn-link" href="#/financeiro/receita">Cadastrar receita →</a>';
+  const items=[];
+  if(month.status==='over'){
+    items.push(`<strong>O ajuste necessário é ${money(month.gapCents)}.</strong> Comece pelas decisões que ainda podem ser mudadas. Resgatar investimentos não reduz o gasto nem muda o teto.`);
+    if(month.structuralCents>month.ceilingCents)items.push(`Contas fixas, empréstimos e limite especial já somam ${money(month.structuralCents)}, acima do teto de ${money(month.ceilingCents)}. Pequenos cortes podem não bastar: confira a renda cadastrada e reveja custos recorrentes para os próximos meses. Parcelas contratadas continuam devidas.`);
+    if(month.variableCandidates.length)items.push(`Há ${money(month.variablePlannedCents)} em despesas avulsas ainda previstas. Avalie quais são necessárias e quais podem ser reduzidas, substituídas ou adiadas antes de assumir o gasto. O valor inteiro não é uma economia garantida.`);
+    else items.push('Não há despesas avulsas previstas cadastradas para reavaliar. Evite assumir novos gastos e examine os próximos compromissos; apagar uma despesa real ou adiar um pagamento obrigatório não cria economia.');
+  }else items.push(`Você tem ${money(month.roomCents)} de margem até o teto, considerando todas as despesas já cadastradas. Antes de uma nova compra, confira em qual mês a fatura será cobrada.`);
+  const cards=month.categories.find(group=>group.id==='cards').cents;
+  if(cards)items.push(`As faturas já somam ${money(cards)}. Confira cobranças e parcelas. Para economizar daqui para frente, limite novas compras nos meses apertados; o que já foi comprado continua a pagar.`);
+  return `<ol class="insight-priorities">${items.map(item=>`<li>${item}</li>`).join('')}</ol>${month.variableCandidates.length?`<div class="stack gap-10"><h3>Despesas previstas para avaliar</h3>${month.variableCandidates.map(item=>`<div class="expense-subtotal-row"><span>${esc(item.label)}</span><strong>${money(item.cents)}</strong></div>`).join('')}</div>`:''}`;
+}
+function renderAI(result) {
+  return `<div class="stack gap-14 gemini-result"><p class="hub-note">${esc(result.summary)}</p>${result.priorities.map(row=>`<article><h3>${monthLabel(row.month)}</h3><p class="hub-note">${esc(row.explanation)}</p><ul>${row.actions.map(line=>`<li>${esc(line)}</li>`).join('')}</ul></article>`).join('')}${result.habits.length?`<div><h3>Ações para sua rotina</h3><ul>${result.habits.map(line=>`<li>${esc(line)}</li>`).join('')}</ul></div>`:''}<p class="hint">${esc(result.model)} · ${new Date(result.generatedAt).toLocaleString('pt-BR')}. Sugestões para você avaliar; nenhum lançamento é alterado automaticamente.</p></div>`;
+}
+export function dispose(){revision++;busy=false;}
+export function afterRender(container,{render}) {
+  bindMonthPicker(container,()=>{error='';render();});
+  container.querySelectorAll('[data-insight-month]').forEach(button=>button.addEventListener('click',()=>{store.selectFinanceMonth(button.dataset.insightMonth);error='';render();container.scrollTop=0;}));
+  container.querySelector('#generate-gemini-insights').addEventListener('click',async()=>{
+    if(busy)return;const snapshot=store.financialInsightSnapshot(),key=JSON.stringify(snapshot),token=revision;
+    busy=true;error='';const button=container.querySelector('#generate-gemini-insights');button.disabled=true;button.textContent='Analisando seus números…';container.querySelector('#gemini-insights-error').textContent='';
+    try{const result=await requestFinancialInsights(snapshot);if(token!==revision)return;aiResult=result;resultSnapshot=key;resultOwner=store.currentUserId();}
+    catch(cause){if(token!==revision)return;error=cause.message;}
+    finally{if(token===revision){busy=false;render();}}
+  });
+}

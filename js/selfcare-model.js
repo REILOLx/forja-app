@@ -1,3 +1,4 @@
+import { REFLECTION_SOURCES } from './reflections.js';
 // Hábitos sugeridos para um adulto jovem; o usuário escolhe quais acompanhar.
 export const SELFCARE_HABITS = [
   {id:'sleep',title:'Sono e desaceleração',detail:'Reserve tempo para dormir pelo menos 7 horas. Tente manter horários regulares e desacelerar antes de deitar.'},
@@ -13,6 +14,8 @@ export function normalizeSelfCare(s) {
   const c=s.selfCare ||= {};
   if(![5,10].includes(c.minutes))c.minutes=10;
   c.sound ??= true;
+  const sources=Array.isArray(c.reflectionSources)?c.reflectionSources.filter(key=>Object.hasOwn(REFLECTION_SOURCES,key)):[];
+  c.reflectionSources=sources.length?[...new Set(sources)]:Object.keys(REFLECTION_SOURCES);
   c.schedule ||= {enabled:false,day:0,time:'09:00'};
   if(!Number.isInteger(c.schedule.day)||c.schedule.day<0||c.schedule.day>6)c.schedule.day=0;
   if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(c.schedule.time||''))c.schedule.time='09:00';

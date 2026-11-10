@@ -654,3 +654,33 @@ h2 { font-size: 17px; font-weight: 700; }
 .expense-installment-row small { display:block; color:var(--text-dim); font-size:11px; }
 .expense-installment-row strong { flex-shrink:0; font-variant-numeric:tabular-nums; }
 @media(max-width:640px) { .expense-details-grid { grid-template-columns:1fr; } .expense-item-top { gap:12px; } .expense-item-amount { font-size:14px; } }
+
+/* ---------- reflexão diária e insights ---------- */
+.daily-reflection { border-color:var(--ember-border); background:linear-gradient(140deg,#163225,var(--surface)); }
+.daily-reflection .section-label { margin:0; }
+.daily-reflection blockquote { margin:4px 0; font:500 clamp(21px,3.3vw,28px)/1.55 'Space Grotesk',sans-serif; color:#d5ebd5; letter-spacing:-.02em; }
+.daily-reflection > div > strong { font-size:13px; }
+.daily-reflection .hint { margin:6px 0 0; }
+.reflection-explanation { border-top:1px solid var(--border); padding-top:16px; }
+.reflection-explanation h3 { margin:0 0 8px; font-size:13px; }
+.reflection-explanation p { font-size:13px; line-height:1.9; margin:0; color:var(--text-dim); }
+.reflection-practice { padding:14px; margin:0; border-radius:12px; background:var(--surface-2); font-size:12px; line-height:1.8; color:var(--text-dim); }
+.reflection-practice strong { color:var(--ember); }
+.insight-entry-link { display:flex; justify-content:space-between; align-items:center; gap:16px; color:var(--text); border-color:var(--ember-border); }
+.insight-entry-link small { display:block; color:var(--text-dim); font-size:12px; line-height:1.8; margin-top:5px; }
+.insight-entry-link strong { font-size:14px; }
+.insight-totals { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; padding:14px 0; border-top:1px solid var(--border); border-bottom:1px solid var(--border); }
+.insight-totals span { min-width:0; font-size:11px; color:var(--text-dim); line-height:1.7; }
+.insight-totals strong { display:block; color:var(--text); font-size:14px; margin-top:4px; overflow-wrap:anywhere; }
+.insight-months { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; }
+.insight-month { display:flex; flex-direction:column; gap:12px; text-align:left; min-width:0; }
+.insight-month > span { font-size:12px; color:var(--text-dim); }
+.insight-month > strong { font:500 20px 'Space Grotesk',sans-serif; overflow-wrap:anywhere; }
+.insight-month > small { font-size:11px; color:var(--text-dim); line-height:1.7; }
+.insight-month.over { border-color:var(--red-border); }
+.insight-priorities, .gemini-result ul { padding-left:20px; margin:0; font-size:13px; color:var(--text-dim); line-height:1.9; }
+.insight-priorities li, .gemini-result li { margin-bottom:14px; }
+.insight-priorities strong { color:var(--text); }
+.gemini-result article { border-top:1px solid var(--border); padding-top:14px; }
+.gemini-result h3 { font-size:15px; }
+@media(max-width:640px) { .insight-months { grid-template-columns:1fr 1fr; } .insight-totals { gap:8px; } .insight-totals strong { font-size:12px; } }

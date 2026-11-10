@@ -32,6 +32,7 @@ export function render(state) {
       <a href="#/financeiro/cartoes" class="card quick-action">${icon.card()}<span>Lançar fatura</span></a>
       <a href="#/financeiro/investimentos" class="card quick-action">${icon.target()}<span>Investimentos</span></a>
     </div>
+    <a href="#/financeiro/insights" class="card insight-entry-link"><span><strong>Insights e plano para economizar</strong><small>Veja os meses acima do teto e analise seu planejamento com Gemini.</small></span><span aria-hidden="true">→</span></a>
     <div class="segmented" role="tablist" aria-label="Visões do financeiro">
       ${[['overview','Visão geral'],['ledger','Lançamentos'],['commitments','Compromissos']].map(([id,label])=>`<button role="tab" aria-selected="${tab===id}" class="${tab===id?'active':''}" data-finance-tab="${id}">${label}</button>`).join('')}
     </div>
