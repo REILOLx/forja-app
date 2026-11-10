@@ -554,6 +554,8 @@ export function weeksStreak(d = new Date()) {
 // ---------- estudos ----------
 export function updateStudyTrack(patch) {
   Object.assign(state.studyTrack, patch);
+  const legacy=state.studyCourses?.find(c=>c.legacyTrack);
+  if(legacy)Object.assign(legacy,{title:state.studyTrack.title,module:state.studyTrack.module,totalModules:state.studyTrack.totalModules,nextTopic:state.studyTrack.nextTopic});
   save();
 }
 
@@ -1004,3 +1006,21 @@ export function setBusinessGoal(businessId,ym,amount) {
   if(!state.businesses.some(b=>b.id===businessId)||!/^\d{4}-(0[1-9]|1[0-2])$/.test(ym)||!Number.isFinite(amount)||amount<0)throw new Error('Informe uma meta mensal válida.');
   state.businessGoals[`${businessId}:${ym}`]=Math.round(amount*100)/100;save();
 }
+
+// ---------- cursos e diário de aprendizados ----------
+export function saveStudyCourse(input,id) {
+  const data=hub.courseInput(input),course=id?state.studyCourses.find(c=>c.id===id):null;
+  if(id&&!course)throw new Error('Curso não encontrado.');
+  if(course)Object.assign(course,data);else state.studyCourses.push({...data,id:uid('course'),createdAt:new Date().toISOString()});
+  if(course?.legacyTrack)Object.assign(state.studyTrack,{title:course.title,module:course.module,totalModules:course.totalModules,nextTopic:course.nextTopic});
+  save();
+}
+export function saveLearningEntry(input,id) {
+  const data=hub.learningInput(state,input,todayISO()),entry=id?state.learningEntries.find(e=>e.id===id):null;
+  if(id&&!entry)throw new Error('Aprendizado não encontrado.');
+  if(entry)Object.assign(entry,data,{updatedAt:new Date().toISOString()});
+  else state.learningEntries.push({...data,id:uid('learning'),createdAt:new Date().toISOString()});
+  save();
+}
+export function removeLearningEntry(id) {state.learningEntries=state.learningEntries.filter(e=>e.id!==id);save();}
+export function courseSummary(courseId='all',month) {return hub.courseSummary(state,courseId,month);}

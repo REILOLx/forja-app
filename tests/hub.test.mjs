@@ -87,3 +87,35 @@ test('clientes, metas por mês e vínculo entre empresas são validados',()=>{
  store.removeBusinessClient(client.id);assert.equal(s.businessEntries[0].amount,100);assert.equal(s.businessEntries[0].clientId,'');
  const backup=store.exportData();store.importData(backup);assert.equal(store.exportData(),backup);
 });
+
+test('inglês é preservado como curso e mantém progresso sincronizado nas duas telas',()=>{
+ clean();const s=store.getState(),track=structuredClone(s.studyTrack);delete s.studyCourses;
+ normalizeHub(s);const english=s.studyCourses[0];assert.equal(english.title,track.title);assert.equal(english.module,track.module);assert.equal(english.totalModules,track.totalModules);
+ store.saveStudyCourse({title:'Curso de negócios no ChatGPT',provider:'ChatGPT',status:'active',module:0,totalModules:0,nextTopic:'Precificação'});
+ const business=s.studyCourses.at(-1),before=JSON.stringify(s.studyCourses);normalizeHub(s);assert.equal(JSON.stringify(s.studyCourses),before);
+ store.updateStudyTrack({module:7});assert.equal(english.module,7);assert.equal(business.module,0);
+ store.saveStudyCourse({...english,module:8,status:'completed'},english.id);assert.equal(s.studyTrack.module,8);assert.equal(s.studyTrack.title,track.title);assert.equal(business.status,'active');
+});
+test('aprendizados de PDFs ficam por curso e período, sem alterar a meta de livros ou o financeiro',()=>{
+ clean();const s=store.getState(),today=store.todayISO(),ym=today.slice(0,7);
+ store.saveStudyCourse({title:'Curso de IA',provider:'ChatGPT',status:'active',module:0,totalModules:0});const course=s.studyCourses.at(-1);
+ store.startReadingTimer(s.books[0].id);const reading={log:structuredClone(s.readingLog),sessions:structuredClone(s.readingSessions),timer:structuredClone(s.activeReadingTimer),plan:structuredClone(s.readingPlan),books:structuredClone(s.books)},finance=structuredClone(s.finance);
+ store.saveLearningEntry({courseId:course.id,date:today,topic:'Aula de agentes',summary:'Aprendi a dividir tarefas e validar resultados.',status:'review',minutes:45,materialTitle:'Aula 01.pdf',materialUrl:'https://chatgpt.com/c/exemplo',application:'Aplicar em um fluxo da empresa',questions:'Como medir qualidade?',nextStep:'Criar uma primeira versão'});
+ const entry=s.learningEntries[0],summary=store.courseSummary(course.id,ym);
+ assert.equal(summary.entries,1);assert.equal(summary.minutes,45);assert.equal(summary.review,1);assert.equal(summary.days,1);assert.equal(entry.materialTitle,'Aula 01.pdf');assert.equal(entry.application,'Aplicar em um fluxo da empresa');
+ assert.deepEqual({log:s.readingLog,sessions:s.readingSessions,timer:s.activeReadingTimer,plan:s.readingPlan,books:s.books},reading);assert.deepEqual(s.finance,finance);
+ assert.equal(store.courseSummary(s.studyCourses[0].id).entries,0);
+ store.saveLearningEntry({...entry,status:'learned',summary:'Aprendizado revisado.'},entry.id);assert.equal(store.courseSummary(course.id).review,0);assert.equal(store.courseSummary(course.id).entries,1);assert.equal(course.module,0);
+ assert.equal(store.courseSummary(course.id,store.addMonths(ym,1)).entries,0);
+ const backup=store.exportData();store.importData(backup);assert.equal(store.exportData(),backup);
+ store.removeLearningEntry(entry.id);assert.equal(store.courseSummary(course.id).entries,0);assert.equal(store.getState().studyCourses.length,2);
+});
+test('cursos e aprendizados rejeitam valores inválidos e links inseguros antes de alterar dados',()=>{
+ clean();const s=store.getState(),course=s.studyCourses[0],before=store.exportData();
+ assert.throws(()=>store.saveStudyCourse({title:'',module:0,totalModules:0}));
+ assert.throws(()=>store.saveStudyCourse({title:'Curso',module:4,totalModules:3,status:'active'}));
+ assert.throws(()=>store.saveStudyCourse({title:'Curso',module:0,totalModules:0,status:'__proto__'}));
+ const input={courseId:course.id,date:store.todayISO(),topic:'Tema',summary:'Aprendizado',status:'learned',minutes:10};
+ for(const invalid of [{courseId:'missing'},{date:'2099-01-01'},{date:'2026-02-30'},{topic:' '},{summary:''},{minutes:-1},{minutes:1.5},{status:'__proto__'},{materialUrl:'javascript:alert(1)'},{materialUrl:'data:application/pdf;base64,AAAA'},{materialUrl:'https://usuario:senha@example.test/pdf'}])assert.throws(()=>store.saveLearningEntry({...input,...invalid}));
+ assert.equal(store.exportData(),before);
+});

@@ -1,6 +1,6 @@
 import { icon } from '../icons.js';
 const groups=[
- ['Seu dia',[['/rotina','Rotina','Organize horários e tarefas',icon.clock],['/treino','Treinos','Plano semanal e histórico de treinos',icon.dumbbell],['/estudos','Estudos e leituras','Sua biblioteca e trilha de aprendizado',icon.book],['/metas','Metas','Acompanhe seus objetivos',icon.target],['/bloqueio','Foco','Gerencie seus momentos de concentração',icon.lock]]],
+ ['Seu dia',[['/rotina','Rotina','Organize horários e tarefas',icon.clock],['/treino','Treinos','Plano semanal e histórico de treinos',icon.dumbbell],['/estudos','Estudos e leituras','Sua biblioteca e trilha de aprendizado',icon.book],['/estudos/cursos','Cursos e aprendizados','Aulas, PDFs e registros dos seus cursos',icon.book],['/metas','Metas','Acompanhe seus objetivos',icon.target],['/bloqueio','Foco','Gerencie seus momentos de concentração',icon.lock]]],
  ['Sua gestão',[['/financeiro','Financeiro pessoal','Gastos, faturas e investimentos',icon.wallet],['/negocios','Seus negócios','Empresas, faturamento e clientes',icon.business]]],
  ['Preferências',[['/config','Ajustes e backup','Sua conta, sincronização e dados',icon.gear]]],
 ];

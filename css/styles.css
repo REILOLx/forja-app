@@ -503,3 +503,12 @@ h2 { font-size: 17px; font-weight: 700; }
 .reading-history-row .hub-section-title { font-size:12px; }
 .reading-history-row .progress-track { display:block; width:100%; }
 @media(max-width:420px) { .reading-month-totals { grid-template-columns:1fr; gap:10px; } .reading-month-totals > span { display:flex; justify-content:space-between; align-items:center; gap:12px; } .reading-month-totals b { margin:0; font-size:16px; } }
+
+.course-kpis { grid-template-columns:repeat(3,minmax(0,1fr)); }
+.course-next { font-size:13px; line-height:1.7; }
+.course-history-filters { display:flex; flex-wrap:wrap; align-items:flex-end; gap:14px; }
+.course-history-filters > .field { flex:1; min-width:150px; }
+.course-history-filters > .recurring-option { padding:12px 0; }
+.course-learning-summary { margin:0; color:var(--text); }
+#learning-history h4 { font-size:12px; color:var(--text-dim); margin:16px 0 8px; }
+@media(max-width:600px) { .course-kpis { grid-template-columns:repeat(3,minmax(0,1fr)); } .course-kpis .metric { padding:14px 10px; } .course-kpis .metric span { font-size:10px; line-height:1.6; } }

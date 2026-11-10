@@ -4,6 +4,8 @@ import { sum, money } from './finance-model.js';
 
 export const TRAINING_TYPES = { jiujitsu:'Jiu-jitsu', pedal:'Pedal', casa:'Treino em casa', outro:'Outra atividade' };
 export const BOOK_STATUSES = { reading:'Lendo', queued:'Quero ler', paused:'Pausado', finished:'Concluído' };
+export const COURSE_STATUSES = {active:'Em andamento',paused:'Pausado',completed:'Concluído'};
+export const LEARNING_STATUSES = {learned:'Estudado',review:'Quero revisar'};
 export const CLIENT_STATUSES = { active:'Ativo', lead:'Em negociação', inactive:'Inativo' };
 export function normalizeHub(s) {
   s.trainingSessions ||= [];
@@ -13,6 +15,8 @@ export function normalizeHub(s) {
   s.workoutLog ||= {};
   s.dailyReadingGoalMin ??= 20;
   s.studyTrack ||= {title:'Sua trilha de estudo',module:0,totalModules:1,nextTopic:''};
+  if(!Array.isArray(s.studyCourses))s.studyCourses=[{...s.studyTrack,id:'course-migrated-track',provider:'',status:'active',legacyTrack:true}];
+  s.learningEntries ||= [];
   if (!Array.isArray(s.books)) {
     s.books = [];
     if (s.currentBook?.title) s.books.push({ ...s.currentBook, id:'book-migrated-current', status:'reading' });
@@ -99,4 +103,35 @@ export function businessSummary(s,ym,businessId='all') {
     margin:revenue>0?Math.round((revenue-expenses)/revenue*1000)/10:null,
     clients:clients.filter(c=>c.status==='active').length,leads:clients.filter(c=>c.status==='lead').length,
     newClients:clients.filter(c=>c.since.slice(0,7)===ym).length,goal,entries:entries.length};
+}
+
+export function courseInput(input) {
+  const title=text(input.title,160),provider=text(input.provider,120),status=input.status||'active';
+  if(!title||!Object.hasOwn(COURSE_STATUSES,status))throw new Error('Informe o nome e a situação do curso.');
+  const totalModules=number(input.totalModules||0,0,true);
+  let module=number(input.module||0,0,true);
+  if(totalModules&&module>totalModules)throw new Error('Os módulos concluídos não podem ultrapassar o total.');
+  if(status==='completed'&&totalModules)module=totalModules;
+  return {title,provider,status,module,totalModules,nextTopic:text(input.nextTopic,200)};
+}
+export function learningInput(s,input,today) {
+  const course=s.studyCourses.find(c=>c.id===input.courseId),topic=text(input.topic,180),summary=text(input.summary,4000);
+  if(!course)throw new Error('Escolha o curso deste aprendizado.');
+  if(!validDate(input.date)||input.date>today)throw new Error('Informe uma data de estudo atual ou anterior.');
+  if(!topic||!summary)throw new Error('Informe o assunto da aula e o que você aprendeu.');
+  const status=input.status||'learned';
+  if(!Object.hasOwn(LEARNING_STATUSES,status))throw new Error('Escolha a situação do aprendizado.');
+  let materialUrl=text(input.materialUrl,2048);
+  if(materialUrl){
+    try{const url=new URL(materialUrl);if(!['http:','https:'].includes(url.protocol)||url.username||url.password)throw new Error();materialUrl=url.href;}
+    catch{throw new Error('Use um link http ou https válido para o material ou a conversa.');}
+  }
+  return {courseId:course.id,courseTitle:course.title,date:input.date,topic,summary,status,
+    minutes:number(input.minutes||0,0,true),materialTitle:text(input.materialTitle,200),materialUrl,
+    application:text(input.application,2000),questions:text(input.questions,1600),nextStep:text(input.nextStep,1000)};
+}
+export function courseSummary(s,courseId='all',month) {
+  const entries=s.learningEntries.filter(e=>(courseId==='all'||e.courseId===courseId)&&(!month||e.date.slice(0,7)===month));
+  return {entries:entries.length,minutes:entries.reduce((n,e)=>n+e.minutes,0),review:entries.filter(e=>e.status==='review').length,
+    days:new Set(entries.map(e=>e.date)).size,lastDate:entries.map(e=>e.date).sort().at(-1)||null};
 }
