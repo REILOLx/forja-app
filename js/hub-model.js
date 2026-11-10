@@ -1,3 +1,5 @@
+import { normalizeSelfCare } from './selfcare-model.js';
+export { meditationSummary, reminderInput } from './selfcare-model.js';
 import { normalizeReading } from './reading-model.js';
 export { readingDay, readingMonth, readingHistory, readingMonthDays, timerElapsed, formatReadingSeconds, formatReadingClock } from './reading-model.js';
 import { sum, money } from './finance-model.js';
@@ -30,7 +32,7 @@ export function normalizeHub(s) {
   s.businessEntries ||= [];
   s.businessClients ||= [];
   s.businessGoals ||= {};
-  return normalizeReading(s);
+  return normalizeSelfCare(normalizeReading(s));
 }
 export function validDate(date) {
   return /^\d{4}-\d{2}-\d{2}$/.test(date||'') && !Number.isNaN(Date.parse(date+'T12:00:00Z')) && new Date(date+'T12:00:00Z').toISOString().slice(0,10)===date;

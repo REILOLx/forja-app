@@ -960,7 +960,7 @@ export function saveBook(input,id) {
 export function removeBook(id) {if(state.activeReadingTimer?.bookId===id)throw new Error('Conclua a sessão deste livro antes de removê-lo.');state.books=state.books.filter(b=>b.id!==id);save();}
 export function registerReading() {throw new Error('Os minutos são registrados somente pelo cronômetro de hoje.');}
 export function removeReadingSession() {throw new Error('Os registros de leitura são permanentes e não podem ser excluídos.');}
-function saveReadingState() {save();clearTimeout(pushTimer);if(cloudUserId&&cloudReady)void pushToCloudNow();}
+function saveTimerState() {save();clearTimeout(pushTimer);if(cloudUserId&&cloudReady)void pushToCloudNow();}
 export function readingDay(date=todayISO()) {return hub.readingDay(state,date,todayISO());}
 export function readingMonth(month=monthKey()) {return hub.readingMonth(state,month,todayISO());}
 export function readingHistory() {return hub.readingHistory(state,todayISO());}
@@ -968,7 +968,7 @@ export function expireReadingTimer() {
   const timer=state.activeReadingTimer;
   if(!timer||timer.date===todayISO()&&Date.now()<timer.endsAt)return false;
   if(!state.readingSessions.some(e=>e.id===timer.id))state.readingSessions.push({id:timer.id,source:'timer',status:'expired',bookId:timer.bookId,bookTitle:timer.bookTitle,date:timer.date,minutes:0,pagesRead:0,elapsedMs:0,createdAt:new Date().toISOString()});
-  state.activeReadingTimer=null;saveReadingState();return true;
+  state.activeReadingTimer=null;saveTimerState();return true;
 }
 export function startReadingTimer(bookId) {
   expireReadingTimer();
@@ -977,7 +977,7 @@ export function startReadingTimer(bookId) {
   if(!book||book.status==='finished')throw new Error('Selecione um livro em leitura, pausado ou na fila.');
   const now=new Date(),end=new Date(now.getFullYear(),now.getMonth(),now.getDate()+1).getTime();
   state.activeReadingTimer={id:uid('timed-reading'),bookId:book.id,bookTitle:book.title,date:todayISO(now),startedAt:now.getTime(),endsAt:end,stoppedAt:null,startPage:book.pageCurrent};
-  saveReadingState();
+  saveTimerState();
 }
 export function stopReadingTimer() {
   if(expireReadingTimer())throw new Error('O dia da sessão terminou. Não é possível registrar uma leitura de ontem.');
@@ -985,7 +985,7 @@ export function stopReadingTimer() {
   if(!timer)throw new Error('Inicie uma leitura primeiro.');
   if(timer.stoppedAt!==null)return;
   if(Date.now()-timer.startedAt<1000)throw new Error('O cronômetro precisa registrar pelo menos um segundo.');
-  timer.stoppedAt=Date.now();saveReadingState();
+  timer.stoppedAt=Date.now();saveTimerState();
 }
 export function completeReadingTimer(pagesRead) {
   if(expireReadingTimer())throw new Error('O dia terminou e o registro não pode ser preenchido retroativamente.');
@@ -1000,7 +1000,7 @@ export function completeReadingTimer(pagesRead) {
   state.readingSessions.push({...timer,source:'timer',status:'completed',elapsedMs,minutes,pagesRead,page,createdAt:new Date().toISOString()});
   state.readingLog[timer.date]=(Math.round((state.readingLog[timer.date]||0)*60)+seconds)/60;
   book.pageCurrent=page;book.status=book.pageTotal&&page===book.pageTotal?'finished':'reading';
-  state.activeReadingTimer=null;saveReadingState();
+  state.activeReadingTimer=null;saveTimerState();
 }
 export function businessSummary(ym=monthKey(),businessId='all') { return hub.businessSummary(state,ym,businessId); }
 export function saveBusinessEntry(input,id) {
@@ -1041,3 +1041,56 @@ export function saveLearningEntry(input,id) {
 }
 export function removeLearningEntry(id) {state.learningEntries=state.learningEntries.filter(e=>e.id!==id);save();}
 export function courseSummary(courseId='all',month) {return hub.courseSummary(state,courseId,month);}
+
+
+// ---------- autocuidado ----------
+export function meditationSummary(year=new Date().getFullYear()) {return hub.meditationSummary(state.selfCare,year);}
+export function updateMeditationSettings({minutes,sound,enabled,day,time}) {
+  if(![5,10].includes(minutes)||!Number.isInteger(day)||day<0||day>6||!/^([01]\d|2[0-3]):[0-5]\d$/.test(time||''))throw new Error('Confira a duração, o dia e o horário.');
+  Object.assign(state.selfCare,{minutes,sound:!!sound,schedule:{enabled:!!enabled,day,time}});save();
+}
+export function startMeditation() {
+  const c=state.selfCare;
+  if(c.active)throw new Error('Conclua ou encerre a sessão em andamento primeiro.');
+  const startedAt=Date.now();
+  c.active={id:uid('meditation'),minutes:c.minutes,startedAt,endsAt:startedAt+c.minutes*60000,alertedAt:null};
+  saveTimerState();
+}
+export function markMeditationFinished() {
+  const timer=state.selfCare.active;
+  if(!timer||Date.now()<timer.endsAt||timer.alertedAt!==null)return false;
+  timer.alertedAt=Date.now();saveTimerState();return true;
+}
+export function completeMeditation() {
+  const c=state.selfCare,timer=c.active;
+  if(!timer||Date.now()<timer.endsAt)throw new Error('Aguarde o fim do tempo para registrar a sessão completa.');
+  if(!c.sessions.some(s=>s.id===timer.id))c.sessions.push({id:timer.id,minutes:timer.minutes,date:todayISO(new Date(timer.endsAt)),startedAt:timer.startedAt,endedAt:timer.endsAt,confirmedAt:Date.now()});
+  c.active=null;saveTimerState();
+}
+export function cancelMeditation() {state.selfCare.active=null;saveTimerState();}
+export function toggleSelfCareHabit(id) {
+  const c=state.selfCare,habit=c.habits.find(h=>h.id===id);
+  if(!habit||!habit.enabled)throw new Error('Cuidado não encontrado na rotina.');
+  const day=c.daily[todayISO()] ||= {};day[id]=!day[id];save();
+}
+export function enableSelfCareHabit(id,enabled) {
+  const habit=state.selfCare.habits.find(h=>h.id===id);
+  if(!habit)throw new Error('Cuidado não encontrado.');
+  habit.enabled=!!enabled;save();
+}
+export function addSelfCareHabit(title) {
+  title=String(title||'').trim().slice(0,120);
+  if(!title)throw new Error('Dê um nome ao seu cuidado.');
+  state.selfCare.habits.push({id:uid('care'),title,detail:'Cuidado definido por você.',enabled:true});save();
+}
+export function saveCareReminder(input,id) {
+  const data=hub.reminderInput(input),entry=id?state.selfCare.reminders.find(r=>r.id===id):null;
+  if(id&&!entry)throw new Error('Lembrete não encontrado.');
+  if(entry)Object.assign(entry,data);else state.selfCare.reminders.push({...data,id:uid('care-reminder'),done:false});save();
+}
+export function toggleCareReminder(id) {
+  const r=state.selfCare.reminders.find(r=>r.id===id);
+  if(!r)throw new Error('Lembrete não encontrado.');
+  r.done=!r.done;r.completedDate=r.done?todayISO():null;save();
+}
+export function removeCareReminder(id) {state.selfCare.reminders=state.selfCare.reminders.filter(r=>r.id!==id);save();}

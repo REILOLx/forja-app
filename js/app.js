@@ -4,6 +4,8 @@ import { icon } from './icons.js';
 
 import * as viewHome from './views/home.js';
 import * as viewMenu from './views/menu.js';
+import * as viewAutocuidado from './views/autocuidado.js';
+import { syncMeditationRuntime } from './meditation-runtime.js';
 import * as viewNegocios from './views/negocios.js';
 import * as viewTreinoPlano from './views/treino-plano.js';
 import * as viewRotina from './views/rotina.js';
@@ -33,6 +35,7 @@ registerRoute('/financeiro/receita', viewReceita);
 registerRoute('/financeiro/investimentos', viewInvestimentos);
 registerRoute('/home', viewHome);
 registerRoute('/menu', viewMenu);
+registerRoute('/autocuidado', viewAutocuidado);
 registerRoute('/negocios', viewNegocios);
 registerRoute('/treino/plano', viewTreinoPlano);
 registerRoute('/rotina', viewRotina);
@@ -85,6 +88,7 @@ let currentSession = null;
 let activeView = null;
 
 function render() {
+  syncMeditationRuntime(authReady && !!currentSession);
   activeView?.dispose?.(); activeView=null;
   if (!authReady) {
     viewEl.innerHTML = '<div class="muted" style="padding:60px 20px;text-align:center;">Carregando…</div>';
@@ -262,6 +266,11 @@ const ACTIONS = {
 window.__forja = { store, render, navigate, sb };
 
 onRouteChange(render);
+window.addEventListener('forja:meditation-finished', () => {
+  if (!authReady || !currentSession) return;
+  render();
+  toast('Tempo da meditação concluído. Confirme sua prática em Autocuidado.');
+});
 window.addEventListener('forja:sync', () => { document.getElementById('sync-status').hidden = store.cloudSyncStatus() !== 'error'; });
 
 // A busca de dados não pode ser aguardada dentro do callback de autenticação:
