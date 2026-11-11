@@ -7,12 +7,13 @@ import {dailyReflection,dailyReflections,REFLECTIONS,REFLECTION_SOURCES,PHILOSOP
 import {financialSnapshot,validateSnapshot,validateInsightResponse} from '../js/financial-insights-model.js';
 import {shiftMonth} from '../js/finance-model.js';
 import {createFinancialHandler} from '../supabase/functions/forja-insights/handler.js';
+import {cachedInsights,cacheInsights} from '../js/insights-cache.js';
 const storage=new Map();globalThis.localStorage={getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v)};globalThis.window={dispatchEvent(){}};
 let source=await fs.readFile(new URL('../js/store.js',import.meta.url),'utf8');source=source.replace("import { sb } from './supabase-client.js';",'const sb={};');
 for(const file of ['finance-model.js','hub-model.js'])source=source.replace("'./"+file+"'",JSON.stringify(pathToFileURL(resolve('js',file)).href));
 const store=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
 function snapshot(){return financialSnapshot('2026-11','2026-11-10',Array.from({length:12},(_,i)=>({month:shiftMonth('2026-11',i),income:4000,expenses:3500,invested:2080,groups:[{id:'bills',label:'Contas fixas',total:1800,items:[{id:'bill:home',label:'Casa',amount:1800,status:'Pago'}]},{id:'cards',label:'Faturas',total:1300,items:[{id:'card:a',label:'Fatura',amount:1300,status:'Previsto',invoice:true}]},{id:'loans',label:'Empréstimos',total:0,items:[]},{id:'variable',label:'Avulsas',total:400,items:[{id:'entry:planned',label:'Passeio',amount:400,status:'Previsto'}]},{id:'lis',label:'Limite especial',total:0,items:[]}]})));}
-const ai={summary:'Reveja novas compras para os meses apertados.',currentDiagnosis:'As despesas do mês superam o teto, com concentração em casa e fatura.',priorities:[{month:'2026-11',explanation:'As faturas e os compromissos estão pressionando o teto.',actions:['Avalie se o passeio previsto pode ser reduzido.']}],savingsPlan:[{month:'2026-11',expenseId:'entry:planned',action:'Reavaliar o passeio',how:'Compare alternativas antes de contratar.',potentialSavingCents:10000,condition:'Somente se a despesa for opcional e a alternativa estiver disponível.'}],monthlyOutlook:snapshot().months.map(row=>({month:row.month,assessment:'Confira o planejamento e evite novos compromissos neste mês.'})),habits:['Confira o mês da fatura antes de comprar.']};
+const ai={summary:'Reveja novas compras para os meses apertados.',currentDiagnosis:'As despesas do mês superam o teto, com concentração em casa e fatura.',priorities:[{month:'2026-11',explanation:'As faturas e os compromissos estão pressionando o teto.',actions:['Avalie se o passeio previsto pode ser reduzido.']},{month:'2026-12',explanation:'Confira os compromissos antes de assumir novas compras.',actions:['Reserve o valor dos pagamentos do próximo mês.']}],savingsPlan:[{month:'2026-11',expenseId:'entry:planned',action:'Reavaliar o passeio',how:'Compare alternativas antes de contratar.',potentialSavingCents:10000,condition:'Somente se a despesa for opcional e a alternativa estiver disponível.'}],monthlyOutlook:snapshot().months.map(row=>({month:row.month,assessment:'Confira o planejamento e evite novos compromissos neste mês.'})),habits:['Confira o mês da fatura antes de comprar.']};
 function mockServer(overrides={}) {
  const calls=[],env={SUPABASE_URL:'https://forja-test.supabase.co',SUPABASE_ANON_KEY:'public-project-key',GEMINI_API_KEY:'fake-secret-only-in-tests',FORJA_AI_ALLOWED_USER_IDS:'owner-id',...overrides.env};
  const handler=createFinancialHandler({getEnv:name=>env[name],fetchImpl:async(url,options)=>{calls.push({url,options});if(url.includes('/auth/v1/user'))return new Response(JSON.stringify({id:overrides.userId||'owner-id'}),{status:overrides.authStatus||200});if(overrides.google) return overrides.google(url,options);return new Response(JSON.stringify({candidates:[{finishReason:'STOP',content:{parts:[{text:JSON.stringify(ai)}]}}]}),{status:200});},now:()=>Date.parse('2026-11-10T12:00:00Z')});
@@ -68,6 +69,22 @@ test('retrato da conta acompanha receitas, faturas e empréstimo só a partir da
 });
 test('resposta exige meses conhecidos, texto e ações válidas, sem aceitar resultados de outro período',()=>{
  assert.deepEqual(validateInsightResponse(ai,snapshot()),ai);assert.throws(()=>validateInsightResponse({...ai,summary:''},snapshot()));assert.throws(()=>validateInsightResponse({...ai,priorities:[{...ai.priorities[0],month:'2040-01'}]},snapshot()));assert.throws(()=>validateInsightResponse({...ai,priorities:[{...ai.priorities[0],actions:[]}]},snapshot()));
+ assert.throws(()=>validateInsightResponse({...ai,priorities:[ai.priorities[0]]},snapshot()),/próximo mês/);
+ assert.throws(()=>validateInsightResponse({...ai,priorities:[ai.priorities[1],ai.priorities[0]]},snapshot()),/nessa ordem/);
+});
+test('cache evita repetir análise na sessão e invalida com novos dados, outro usuário ou após 24 horas',async()=>{
+ const rows=new Map(),storage={getItem:key=>rows.get(key),setItem:(key,value)=>rows.set(key,value)},now=Date.parse('2026-11-10T12:00Z'),options={storage,now};
+ const result={...ai,model:'test-model',generatedAt:new Date(now).toISOString()},value=snapshot();
+ await cacheInsights('owner',value,result,options);assert.deepEqual(await cachedInsights('owner',value,options),result);
+ assert.equal(await cachedInsights('other-owner',value,options),null);
+ assert.equal(await cachedInsights('owner',{...value,today:'2026-11-11'},options),null);
+ const changed=structuredClone(value);changed.months[0].items[0].cents++;assert.equal(await cachedInsights('owner',changed,options),null);
+ assert.equal(await cachedInsights('owner',value,{storage,now:now+86400000}),null);
+ assert.equal(await cachedInsights('owner',value,{storage,now:now-1}),null);
+ const serialized=rows.get('forja:gemini:owner');assert.ok(!serialized.includes('incomeEntries'));assert.ok(!serialized.includes('expenseCents'));
+ const broken=JSON.parse(serialized);broken.result.priorities=[];rows.set('forja:gemini:owner',JSON.stringify(broken));assert.equal(await cachedInsights('owner',value,options),null);
+ const blocked={getItem(){throw new Error('Storage blocked');},setItem(){throw new Error('Storage blocked');}};
+ assert.equal(await cachedInsights('owner',value,{storage:blocked,now}),null);await assert.doesNotReject(()=>cacheInsights('owner',value,result,{storage:blocked,now}));
 });
 test('servidor exige sessão válida, origem permitida, configuração e usuário autorizado',async()=>{
  let server=mockServer();let response=await server.handler(server.req(undefined,{authorization:''}));assert.equal(response.status,401);assert.equal(server.calls.length,0);

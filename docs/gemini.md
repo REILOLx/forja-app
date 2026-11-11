@@ -34,7 +34,9 @@ Para usar o Supabase:
    O arquivo `supabase/config.toml` desliga apenas a verificação legada no gateway;
    **o handler sempre verifica o token do usuário em `/auth/v1/user`** e confere
    a lista de UUIDs autorizados antes de consultar Gemini.
-5. Na Forja autenticada, abra Financeiro → Insights → Analisar com Gemini.
+5. Na Forja autenticada, abra Financeiro → Insights. A conexão é verificada e a
+   análise de todo o horizonte começa automaticamente, sem selecionar mês. O botão
+   de atualização serve para solicitar uma nova leitura quando desejar.
 
 Não basta cadastrar um segredo no GitHub Pages: ele não executa um backend.
 Publicar a interface também não publica automaticamente a Edge Function.
@@ -63,7 +65,8 @@ para autenticação no servidor e a chave Gemini vai no header `x-goog-api-key`.
 
 O contrato `schemaVersion: 2` valida meses consecutivos a partir do mês atual,
 todas as despesas e sua soma por categoria, saldos e parcelas. A resposta contém
-um diagnóstico atual, prioridades, plano prático com hipóteses de economia ligadas
+um diagnóstico atual, prioridades obrigatórias para o mês atual e o próximo mês,
+plano prático com hipóteses de economia ligadas
 a itens cadastrados e avaliação de CADA mês em ordem. Uma economia quantificada
 não pode exceder a despesa, ser repetida no mesmo item/mês nem incidir em fatura já
 assumida, empréstimo, limite especial ou item pago. São hipóteses condicionadas,
@@ -74,6 +77,14 @@ falha explicitamente, sem cortar gastos silenciosamente. Os limites de saída e
 o timeout do Gemini foram ampliados para o detalhamento completo. O status da
 conexão é verificado antes de habilitar a análise: publicar o frontend não deixa
 um serviço inexistente aparecer como “conectado”.
+
+A tela não tem seletor de mês. O mês atual e o próximo aparecem juntos, e os
+demais meses trazem sua avaliação e detalhes dos gastos. Novos dados ou a virada
+do dia invalidam a leitura anterior. Uma tentativa que falhou não fica se
+repetindo sozinha; o usuário pode tentar novamente. Um cache validado na sessão
+do navegador, separado por usuário e resumo SHA-256 do retrato, dura até 24 horas
+e evita novas consultas ao recarregar sem alterações. Não contém credenciais nem
+o retrato financeiro completo e funciona como otimização opcional.
 
 Há allowlist de origens e usuários, cache de cinco minutos por retrato/usuário e
 limite POR INSTÂNCIA de três consultas por minuto e vinte por dia. Para múltiplas

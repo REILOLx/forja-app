@@ -1,4 +1,4 @@
-const CACHE_NAME = 'forja-cache-v26';
+const CACHE_NAME = 'forja-cache-v27';
 const ASSETS = [
   './',
   './index.html',
@@ -12,6 +12,7 @@ const ASSETS = [
   './js/finance-model.js',
   './js/financial-insights-model.js',
   './js/gemini-client.js',
+  './js/insights-cache.js',
   './js/reflections.js',
   './js/views/insights.js',
   './js/hub-model.js',
