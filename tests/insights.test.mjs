@@ -139,3 +139,16 @@ test('configuração privada no Vault é lida só no servidor e sua chave nunca 
  const response=await handler(new Request('https://test/functions/v1/forja-insights',{method:'POST',headers:{authorization:'Bearer user-session',origin:'https://reilolx.github.io'},body:JSON.stringify({action:'analyze',snapshot:snapshot()})}));assert.equal(response.status,200);const body=await response.text();assert.ok(!body.includes('fake-vault-key'));assert.ok(!body.includes('private-server-role'));
  const provider=calls.find(call=>call.url.includes('googleapis.com'));assert.equal(provider.options.headers['x-goog-api-key'],'fake-vault-key');assert.ok(!provider.options.body.includes('fake-vault-key'));assert.ok(!provider.options.body.includes('private-server-role'));
 });
+
+test('servidor aceita as novas chaves nomeadas sem enviar secret key como JWT',async()=>{
+ const calls=[],env={SUPABASE_URL:'https://new-keys-test.supabase.co',SUPABASE_PUBLISHABLE_KEYS:JSON.stringify({default:'sb_publishable_fake'}),SUPABASE_SECRET_KEYS:JSON.stringify({default:'sb_secret_fake'})};
+ const handler=createFinancialHandler({getEnv:name=>env[name],fetchImpl:async(url,options)=>{
+  calls.push({url,options});if(url.includes('/auth/v1/user'))return new Response(JSON.stringify({id:'owner'}));
+  if(url.includes('/rpc/forja_read_gemini_config'))return new Response(JSON.stringify({apiKey:'fake-private-key',allowedUserIds:['owner']}));
+  throw new Error('Status não deve consultar Google');
+ }});
+ const response=await handler(new Request('https://new-keys-test/functions/v1/forja-insights',{method:'POST',headers:{authorization:'Bearer user-session',origin:'https://reilolx.github.io'},body:JSON.stringify({action:'status'})}));
+ assert.equal(response.status,200);assert.equal((await response.json()).ready,true);
+ assert.equal(calls[0].options.headers.apikey,'sb_publishable_fake');assert.equal(calls[0].options.headers.authorization,'Bearer user-session');
+ assert.equal(calls[1].options.headers.apikey,'sb_secret_fake');assert.equal(calls[1].options.headers.authorization,undefined);assert.equal(calls.length,2);
+});

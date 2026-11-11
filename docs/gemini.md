@@ -1,4 +1,20 @@
-# Ativar os insights com Gemini
+# Insights com Gemini
+
+## Publicação atual
+
+O serviço `forja-insights` foi ativado no projeto Supabase da Forja em
+11/11/2026 (UTC). A configuração está no Vault e a leitura é exclusiva de
+`service_role`; `anon` e `authenticated` não têm permissão de execução na função
+de configuração. A conta proprietária está autorizada no servidor.
+
+Uma verificação de implantação, com dados simulados, executou o handler no
+Supabase e consultou o Gemini real: resposta HTTP 200, 48 avaliações mensais,
+7 prioridades e 10 ações de economia aceitas pela validação. O teste interno
+foi removido da versão definitiva. Requisições externas sem sessão continuam
+retornando HTTP 401. O diagnóstico dos dados reais é gerado pela própria conta
+ao abrir Financeiro → Insights. Nenhum lançamento é alterado.
+
+## Configuração e manutenção
 
 A Forja é estática no GitHub Pages. A chave do Gemini **não** faz parte do
 JavaScript, do JSON `app_state`, do backup ou do cache offline. A página
@@ -30,7 +46,10 @@ Para usar o Supabase:
    supabase functions deploy forja-insights --project-ref hmzourunlnbwduxfwoom
    ```
 
-   O projeto fornece `SUPABASE_URL` e `SUPABASE_ANON_KEY` no ambiente da função.
+   O projeto fornece `SUPABASE_URL` e suas chaves no ambiente da função.
+   O handler aceita as variáveis legadas e os mapas JSON de chaves nomeadas
+   `SUPABASE_PUBLISHABLE_KEYS` / `SUPABASE_SECRET_KEYS`. Chaves secretas novas
+   são enviadas somente no header `apikey`, sem tratá-las como JWT.
    O arquivo `supabase/config.toml` desliga apenas a verificação legada no gateway;
    **o handler sempre verifica o token do usuário em `/auth/v1/user`** e confere
    a lista de UUIDs autorizados antes de consultar Gemini.
