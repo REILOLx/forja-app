@@ -1,4 +1,4 @@
-export { financialSnapshot } from './financial-insights-model.js';
+export { financialSnapshot, insightHorizon } from './financial-insights-model.js';
 import { normalizeSelfCare } from './selfcare-model.js';
 export { philosopherPreferences } from './reflections.js';
 export { meditationSummary, reminderInput } from './selfcare-model.js';

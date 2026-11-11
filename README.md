@@ -65,8 +65,11 @@ de teste; não acessa Supabase. `tests/mobile.html` contém uma janela de teste 
   dez autores e 28 textos bíblicos. A seleção de autores vale para o bloco filosófico;
   o bíblico aparece todos os dias. Os dois textos permanecem no dia e mudam pela data
   local, inclusive ao retornar ao app após a meia-noite.
-- Financeiro → Insights mostra o teto, a margem ou o excesso e os 12 meses seguintes,
-  com prioridades calculadas a partir das despesas cadastradas. Investimentos continuam
+- Financeiro → Insights começa sempre no mês atual e inclui todos os itens de
+  despesa mês a mês até o último compromisso conhecido, com no mínimo 12 meses.
+  O Gemini recebe receitas, despesas completas, parcelas, contratos e movimentos
+  de investimentos separados, sem recortar apenas os maiores gastos. O retorno
+  inclui diagnóstico atual, plano prático de economia e leitura de cada mês. Investimentos continuam
   separados dos gastos e parcelas obrigatórias permanecem provisionadas.
 - A consulta ao Gemini usa um backend autenticado; a chave nunca entra no frontend,
   no backup ou no repositório. A interface publicada não ativa o backend por si só.

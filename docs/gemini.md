@@ -41,26 +41,60 @@ Publicar a interface também não publica automaticamente a Edge Function.
 
 ## Dados enviados e comportamento
 
-Cada consulta envia um retrato de 12 meses: receitas, teto, despesas, aportes
-separados, valores por categoria, até seis despesas principais e até três despesas
-avulsas previstas de cada mês. Não envia o restante de `app_state`, dados de
-clientes/empresas, leitura, autocuidado, e-mail, senha, tokens Supabase ou dados
-bancários de autenticação. O JWT é usado apenas para autenticar a consulta no
-servidor; a chave Gemini vai apenas no header `x-goog-api-key` ao Google.
+Cada consulta começa SEMPRE no mês atual do dispositivo, independentemente do mês
+selecionado em outras telas. O período vai até o fim dos empréstimos, compras
+parceladas e lançamentos futuros conhecidos, com no mínimo 12 meses. Recorrências
+sem data de fim são projetadas dentro desse intervalo; não há previsão infinita.
 
-Os valores são validados em centavos antes da consulta. O modelo recebe instruções
-para não tratar investimento como despesa, não cortar parcelas obrigatórias, não
-somar faturas com parcelas substituídas e não inventar economias garantidas.
-Os números da interface são sempre calculados pela Forja, não pelo modelo.
-Respostas são validadas e renderizadas como texto, sem HTML executável.
+São enviados todos os itens de despesa de cada mês, sem limites de “top 6” ou “top
+3”: contas fixas, faturas, empréstimos, limite especial e despesas avulsas, com nome,
+valor em centavos, categoria, data/vencimento conhecido, recorrência, situação e
+parcelas conhecidas do cartão. Também seguem todas as ocorrências de receita e
+movimentos de investimentos do período, saldos previstos, patrimônio confirmado e
+previsto, ajustes de conciliação separados, descontos já feitos na folha e os
+cronogramas completos dos contratos.
 
-Há limite de tamanho da requisição, timeout de autenticação/provedor, allowlist de
-origens/usuários, cache de cinco minutos por retrato/usuário e limite **por instância**
-de três consultas por minuto e vinte por dia. Para um serviço com múltiplas
-instâncias ou vários usuários, use um limitador persistente no servidor e ajuste
-também quotas/orçamento do projeto Google; a memória de uma função isolada não
-é um limite global. Nenhum segredo ou conteúdo financeiro é escrito em logs pelo
-handler. A consulta nunca altera lançamentos nem executa transações.
+Uma fatura informada continua substituindo a estimativa. Suas parcelas conhecidas
+são referências marcadas com `includedInInvoiceTotal=false`, sem dupla contagem.
+O app não conhece compras que nunca foram discriminadas; o modelo recebe essa
+limitação. Não se envia o restante de `app_state`, dados de clientes/empresas,
+leituras, autocuidado, e-mail, senha ou credenciais bancárias. O JWT é usado somente
+para autenticação no servidor e a chave Gemini vai no header `x-goog-api-key`.
+
+O contrato `schemaVersion: 2` valida meses consecutivos a partir do mês atual,
+todas as despesas e sua soma por categoria, saldos e parcelas. A resposta contém
+um diagnóstico atual, prioridades, plano prático com hipóteses de economia ligadas
+a itens cadastrados e avaliação de CADA mês em ordem. Uma economia quantificada
+não pode exceder a despesa, ser repetida no mesmo item/mês nem incidir em fatura já
+assumida, empréstimo, limite especial ou item pago. São hipóteses condicionadas,
+não descontos confirmados. Nenhum lançamento ou transação é alterado.
+
+O servidor aceita até 4 MiB por consulta e até 720 meses; se exceder, a análise
+falha explicitamente, sem cortar gastos silenciosamente. Os limites de saída e
+o timeout do Gemini foram ampliados para o detalhamento completo. O status da
+conexão é verificado antes de habilitar a análise: publicar o frontend não deixa
+um serviço inexistente aparecer como “conectado”.
+
+Há allowlist de origens e usuários, cache de cinco minutos por retrato/usuário e
+limite POR INSTÂNCIA de três consultas por minuto e vinte por dia. Para múltiplas
+instâncias use um limitador persistente e quotas/orçamento no projeto Google.
+Nenhuma chave ou conteúdo financeiro é escrito em logs pelo handler. Respostas
+são validadas e renderizadas como texto, sem HTML executável.
+
+### Alternativa de configuração privada pelo Vault
+
+Quando a publicação administrativa disponibiliza SQL e Edge Functions, mas não
+edição de Secrets, o handler também pode ler a configuração do Supabase Vault.
+A migração `supabase/migrations/202611100001_forja_ai_private_config.sql` cria
+apenas uma função de leitura com execução revogada de `public`, `anon` e
+`authenticated`, e concedida exclusivamente a `service_role`.
+
+O administrador cria separadamente um segredo `forja_gemini_config`, cujo valor
+JSON contém `apiKey` e `allowedUserIds`. O valor real nunca entra na migração,
+no repositório nem no frontend. O servidor usa sua chave de serviço, fornecida
+pelo ambiente Supabase, para essa leitura DEPOIS de verificar o usuário no Auth;
+em seguida confere a allowlist antes de chamar Google. A configuração não é
+retornada ao cliente. Secrets de ambiente continuam tendo preferência.
 
 ## Reflexões
 

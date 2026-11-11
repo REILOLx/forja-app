@@ -1155,7 +1155,24 @@ export function removeCareReminder(id) {state.selfCare.reminders=state.selfCare.
 
 export function setReflectionSources(sources) {state.selfCare.reflectionSources=hub.philosopherPreferences(sources);saveImmediately();}
 
-export function financialInsightSnapshot(ym=selectedFinanceMonth()) {
-  const months=Array.from({length:12},(_,i)=>{const month=addMonths(ym,i),summary=financialSummary(month);return {month,income:summary.income,expenses:summary.expenses,invested:summary.invested,groups:expenseBreakdown(month).groups};});
-  return hub.financialSnapshot(ym,todayISO(),months);
+export function financialInsightSnapshot() {
+  const ym=monthKey(),f=state.finance,count=hub.insightHorizon(f,ym);
+  const months=Array.from({length:count},(_,i)=>{
+    const month=addMonths(ym,i),summary=financialSummary(month),breakdown=expenseBreakdown(month),entries=financeEntries(month);
+    for(const group of breakdown.groups)for(const item of group.items){
+      if(group.id==='cards'){
+        const card=f.cards.find(card=>'card:'+card.id===item.id);item.dueDay=card?.dueDay;
+        item.knownInstallments=f.cardCharges.filter(charge=>charge.cardId===card?.id).map(charge=>({id:charge.id,label:charge.desc||'Compra parcelada',amount:installmentAt(charge,month),number:monthsBetween(charge.startMonth,month)+1,total:charge.installments})).filter(part=>part.amount>0);
+      }else if(group.id==='bills'){
+        const bill=fixedBillsForMonth(month).find(bill=>'bill:'+bill.id===item.id);item.dueDay=bill?.dueDay;item.recurring=true;
+      }else if(group.id==='variable'){
+        const entry=item.id.startsWith('entry:')?entries.find(entry=>'entry:'+entry.id===item.id):(f.variableSpend[month]||[]).find(entry=>'legacy:'+entry.id===item.id);
+        item.date=entry?.date;item.recurring=!!entry?.recurring;item.category=entry?.category||'';
+      }
+    }
+    return {month,...summary,reconciliationAdjustment:summary.reconciliationAdjustment,groups:breakdown.groups,incomeEntries:entries.filter(entry=>entry.type==='income'),investmentEntries:entries.filter(entry=>['investment','redemption','yield','valuation'].includes(entry.type)),payrollLoans:breakdown.payrollLoans};
+  });
+  const loans=f.loans.filter(loan=>addMonths(loan.startMonth,loan.installments-1)>=ym).map(loan=>({id:loan.id,label:loan.name,startMonth:loan.startMonth,endMonth:addMonths(loan.startMonth,loan.installments-1),installments:loan.installments,monthlyCents:Math.round(loan.monthlyAmount*100)}));
+  const cardCharges=f.cardCharges.filter(charge=>f.cards.some(card=>card.id===charge.cardId)&&addMonths(charge.startMonth,charge.installments-1)>=ym).map(charge=>({id:charge.id,label:charge.desc||'Compra parcelada',cardId:charge.cardId,startMonth:charge.startMonth,endMonth:addMonths(charge.startMonth,charge.installments-1),installments:charge.installments,totalCents:Math.round(charge.totalAmount*100)}));
+  return hub.financialSnapshot(ym,todayISO(),months,{loans,cardCharges});
 }

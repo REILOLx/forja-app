@@ -687,3 +687,9 @@ h2 { font-size: 17px; font-weight: 700; }
 .reflection-author { display:flex; align-items:center; justify-content:space-between; gap:8px 12px; flex-wrap:wrap; }
 .reflection-author > p { width:100%; }
 .care-meditation-shortcut { display:inline-block; margin-top:14px; }
+.insight-period strong { font-size:14px; line-height:1.8; }
+.insight-period p { margin:8px 0 0; }
+.insight-audit > div { margin-top:18px; }
+.insight-audit-totals { display:flex; flex-direction:column; gap:12px; }
+.gemini-saving-action { padding:16px; border:1px solid var(--border); border-radius:12px; background:var(--surface-2); }
+.gemini-saving-action .hub-section-title > strong { font-size:14px; line-height:1.7; }
